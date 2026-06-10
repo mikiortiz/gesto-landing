@@ -5,7 +5,7 @@ import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { CheckCircle2, Sparkles } from 'lucide-react';
 import { speak } from '../services/speechService';
 
-const APP_LOGIN_URL = 'https://gesto.lat/admin-login';
+const APP_LOGIN_URL = 'https://app.gesto.lat/admin-login';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
