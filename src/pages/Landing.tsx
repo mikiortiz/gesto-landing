@@ -1,762 +1,868 @@
-import { useEffect, useRef } from 'react';
+import { createContext, Fragment, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import { CheckCircle2, Sparkles } from 'lucide-react';
+import { motion, MotionConfig, AnimatePresence, type Variants } from 'framer-motion';
+import {
+  Check, ChevronDown, Download, Volume2, VolumeX, ArrowRight, ScanBarcode, Mic, Banknote, Landmark,
+  NotebookPen, Scale, MonitorSmartphone, Split, PauseCircle, Laptop, Smartphone, Sparkles, Bell,
+} from 'lucide-react';
 import { speak } from '../services/speechService';
 
 const APP_LOGIN_URL = 'https://app.gesto.lat/admin-login';
+// Manual de uso servido por la propia landing (public/docs), así el link no depende del deploy de la app
+const MANUAL_URL = '/docs/gesto-manual-de-uso.pdf';
+const WHATSAPP_URL = 'https://wa.me/5492622517454';
+const MP_ICON = '/imgs/logos-MP/mercadopago.svg';
+const WA_GREEN = '#25D366';
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 28 },
-  visible: { opacity: 1, y: 0 },
+const INTRO_SPEECH = 'Hola, soy Gesto. Te ayudo a vender, cobrar y llevar la caja y el stock de tu comercio desde un solo lugar. Podés probarme sesenta días gratis, y te acompaño paso a paso desde el primer día.';
+
+// Narración por sección: solo suena si la persona activa la voz desde el menú
+const SECTION_SPEECH: Record<string, string> = {
+  producto: 'Con mi punto de venta cobrás al toque. Escaneás el código, elegís cómo cobrar y listo: efectivo, QR de Mercado Pago, transferencia sin comisión o fiado. Y al final del turno, la caja te cierra.',
+  fiados: '¿Cuánta plata perdés porque no podés cobrarle a los clientes a tiempo? Yo armo el mensaje con todo lo que te deben y lo mandamos por WhatsApp en un clic.',
+  'en-vivo': 'Podés tener varias cajas abiertas, en la compu o en el celular, y todo se actualiza al instante. Cuando Mercado Pago aprueba un pago, te enterás en el momento.',
+  voz: 'Si tenés las manos ocupadas, decime Gesto y pedime lo que necesites: agregar al carrito, cobrar, o consultar un precio. Y preguntame lo que quieras sobre tus ventas, tu stock o tus fiados.',
+  'primeros-pasos': 'Arrancar es fácil, porque no estás solo. Apenas entrás, yo te acompaño paso a paso hasta dejar tu negocio listo para vender.',
+  planes: 'Podés probarme sesenta días gratis, sin tarjeta. Después pagás mes a mes, y cambiás de plan cuando quieras.',
 };
 
-function Reveal({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
+const RUBROS = ['Almacenes', 'Verdulerías', 'Carnicerías', 'Panaderías', 'Kioscos', 'Dietéticas', 'Fiambrerías'];
+
+const GUIDE_STEPS: [string, string][] = [
+  ['Elegí tu plan', 'Arrancás con la prueba gratis de 60 días y cambiás cuando quieras.'],
+  ['Configurá cómo cobrás', 'Transferencia a tu CBU o alias, o Mercado Pago: sucursal, caja y cuenta, paso a paso.'],
+  ['Cargá tu primer producto', 'Escaneás el código y Gesto completa los datos que conoce. Vos ponés precio y stock.'],
+  ['Hacé tu primera venta', 'Abrís la caja, agregás el producto y cobrás. Gesto te marca qué tocar.'],
+  ['Armá tu vidriera', 'Nombre, logo, dirección, horarios y WhatsApp para que tus clientes te encuentren.'],
+];
+
+// Límites reales por plan (interno-e-commerce-back: PLAN_LIMITS y services/servicePlan.js)
+const PLANS = [
+  {
+    name: 'Prueba gratis',
+    price: 'Gratis',
+    period: '60 días',
+    note: 'Todo incluido para que lo pruebes en serio.',
+    features: ['3 cajas abiertas a la vez', '1 local', 'Asistente de voz y chat con IA', 'Soporte por email'],
+    cta: 'Empezar la prueba',
+    featured: false,
+  },
+  {
+    name: 'Esencial',
+    price: 20000,
+    period: 'por mes',
+    note: 'Lo necesario para el día a día del mostrador.',
+    features: ['2 cajas abiertas a la vez', 'Hasta 2 locales', 'Ventas, caja, stock y fiados', 'Cobros con QR y transferencia'],
+    cta: 'Elegir Esencial',
+    featured: false,
+  },
+  {
+    name: 'Profesional',
+    price: 35000,
+    period: 'por mes',
+    note: 'Para comercios con más movimiento y más de un turno.',
+    features: ['3 cajas abiertas a la vez', 'Hasta 3 locales', 'Asistente de voz y chat con IA', 'Cierre a ciegas e historial de cierres en PDF'],
+    cta: 'Elegir Profesional',
+    featured: true,
+  },
+];
+
+const FAQ: [string, string][] = [
+  ['¿Necesito tarjeta para probarlo?', 'No. Te registrás y tenés 60 días con todas las funciones. Si después querés seguir, elegís un plan y lo pagás con Mercado Pago, mes a mes.'],
+  ['¿Qué pasa cuando terminan los 60 días?', 'Podés seguir entrando y ver todo lo que cargaste, pero para vender y abrir caja hay que activar un plan. No se borra nada.'],
+  ['¿Funciona en el celular?', 'Sí. Gesto funciona en el navegador de la compu, la tablet o el celular, y podés tener varias cajas abiertas en distintos dispositivos.'],
+  ['¿Qué lector de códigos necesito?', 'Cualquier lector USB común. Si no tenés, podés escanear con la cámara del celular o buscar el producto por nombre.'],
+  ['¿Las transferencias tienen comisión?', 'No. La plata va directo a tu CBU o alias; Gesto no la toca. Los cobros con QR de Mercado Pago tienen la comisión de Mercado Pago, en tu propia cuenta.'],
+  ['¿Tengo que cargar todos los productos a mano?', 'No. Gesto tiene una base de más de 37.000 productos: escaneás el código y se completan nombre y marca. Vos solo ponés precio y stock.'],
+];
+
+const priceFormatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+
+/* ── Animaciones de entrada ──
+   Reveal aparece al entrar en pantalla y escalona a sus Item hijos (uno detrás de otro).
+   Usa variantes con nombre ("hidden"/"show") para que los Item hereden el estado del Reveal que los contiene. */
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+const revealVariants: Variants = {
+  hidden: { opacity: 0, y: 24 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE, staggerChildren: 0.09, delayChildren: 0.08 } },
+};
+// Contenedor que solo escalona (no se mueve él)
+const groupVariants: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
+};
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
+};
+
+function Reveal({ children, className = '', group = false, onLoad = false }: { children: React.ReactNode; className?: string; group?: boolean; onLoad?: boolean }) {
   return (
-    <motion.div variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.12 }} transition={{ duration: 0.6, delay }} className={className}>
+    <motion.div variants={group ? groupVariants : revealVariants} initial="hidden"
+      {...(onLoad ? { animate: 'show' } : { whileInView: 'show', viewport: { once: true, amount: 0.15 } })}
+      className={className}>
       {children}
     </motion.div>
   );
 }
 
-const TAG: Record<string, string> = {
-  blue:   'text-blue-400 border-blue-400/30 bg-blue-400/[0.08]',
-  cyan:   'text-cyan-400 border-cyan-400/30 bg-cyan-400/[0.08]',
-  green:  'text-emerald-400 border-emerald-400/30 bg-emerald-400/[0.08]',
-  purple: 'text-fuchsia-400 border-fuchsia-400/30 bg-fuchsia-400/[0.08]',
-  orange: 'text-amber-400 border-amber-400/30 bg-amber-400/[0.08]',
-  pink:   'text-rose-400 border-rose-400/30 bg-rose-400/[0.08]',
-};
-
-function Tag({ label, color }: { label: string; color: string }) {
-  return <span className={`text-[0.68rem] font-semibold px-2.5 py-0.5 rounded-full border ${TAG[color] ?? TAG.blue}`}>{label}</span>;
+function Item({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <motion.div variants={itemVariants} className={className}>{children}</motion.div>;
 }
 
-function Card({ children, className = '', hover = true }: { children: React.ReactNode; className?: string; hover?: boolean }) {
+function ItemLi({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <motion.li variants={itemVariants} className={className}>{children}</motion.li>;
+}
+
+// Al ir a una sección desde el menú, su contenido se vuelve a montar para que la animación se repita
+const ReplayContext = createContext<Record<string, number>>({});
+function Replay({ id, children }: { id: string; children: React.ReactNode }) {
+  const n = useContext(ReplayContext)[id] ?? 0;
+  return <Fragment key={n}>{children}</Fragment>;
+}
+
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm font-semibold text-teal mb-3">{children}</p>;
+}
+
+function H2({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <h2 className={`font-display font-bold tracking-tight text-ink text-3xl sm:text-4xl leading-[1.1] ${className}`}>{children}</h2>;
+}
+
+function PrimaryButton({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <motion.div
-      whileHover={hover ? { y: -4, boxShadow: '0 20px 40px rgba(0,0,0,0.5)' } : undefined}
-      className={`rounded-2xl border border-white/[0.07] bg-gray-800/40 backdrop-blur-sm transition-all ${className}`}
-    >
+    <a href={APP_LOGIN_URL} target="_blank" rel="noopener noreferrer"
+      className={`inline-flex items-center justify-center gap-2 rounded-lg bg-teal px-5 py-3 font-semibold text-white no-underline transition-colors hover:bg-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal ${className}`}>
       {children}
-    </motion.div>
+    </a>
   );
 }
 
-function SectionTitle({ tag, title, desc, tagColor = 'text-cyan-400' }: { tag: string; title: React.ReactNode; desc?: string; tagColor?: string }) {
+function MpIcon({ size = 18, className = '' }: { size?: number; className?: string }) {
+  return <img src={MP_ICON} alt="Mercado Pago" width={size} height={Math.round(size * 0.73)} className={`inline-block object-contain ${className}`} />;
+}
+
+function WhatsAppGlyph({ size = 16, className = '' }: { size?: number; className?: string }) {
   return (
-    <div className="text-center mb-10 sm:mb-14">
-      <div className={`text-[0.7rem] font-bold uppercase tracking-[0.18em] ${tagColor} mb-3`}>{tag}</div>
-      <h2 className="text-3xl sm:text-4xl lg:text-[2.6rem] font-black tracking-tight text-white leading-tight">{title}</h2>
-      {desc && <p className="mt-3 text-slate-400 text-[0.9rem] sm:text-[0.95rem] max-w-lg mx-auto leading-relaxed">{desc}</p>}
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
+      <path d="M17.47 14.38c-.3-.15-1.75-.86-2.02-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.64.07-.3-.15-1.25-.46-2.38-1.47-.88-.79-1.47-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.03-.52-.07-.15-.67-1.6-.92-2.2-.24-.58-.49-.5-.67-.5h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.21 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.7.63.71.22 1.36.19 1.87.12.57-.09 1.75-.72 2-1.41.25-.69.25-1.29.17-1.41-.07-.12-.27-.2-.57-.35zM12.05 21.5h-.01a9.4 9.4 0 0 1-4.8-1.31l-.34-.2-3.57.93.95-3.48-.22-.36a9.4 9.4 0 0 1-1.44-5.01c0-5.2 4.23-9.43 9.44-9.43 2.52 0 4.89.98 6.67 2.77a9.37 9.37 0 0 1 2.76 6.67c0 5.2-4.23 9.43-9.44 9.43zm8.03-17.46A11.3 11.3 0 0 0 12.05.7C5.8.7.7 5.8.7 12.05c0 2 .52 3.95 1.52 5.67L.6 23.4l5.82-1.53a11.3 11.3 0 0 0 5.63 1.43h.01c6.25 0 11.34-5.09 11.35-11.34 0-3.03-1.18-5.88-3.33-8.02z" />
+    </svg>
+  );
+}
+
+/* ── Pantallas de ejemplo ──
+   Maquetas simples con el aspecto de la app. Se pueden reemplazar por capturas reales
+   (public/imgs/app/*.png) sin tocar el resto de la sección. */
+
+function Screen({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(28,38,40,0.04),0_12px_32px_-12px_rgba(28,38,40,0.18)] overflow-hidden ${className}`}>
+      <div className="flex items-center gap-2 border-b border-line bg-paper px-4 py-2.5">
+        <img src="/imgs/Logo-Gesto.png" alt="" className="h-5 w-5 object-contain" />
+        <span className="text-xs font-semibold text-ink-2">{title}</span>
+      </div>
+      {children}
     </div>
   );
 }
 
-function Divider() {
-  return <div className="max-w-5xl mx-auto h-px bg-gradient-to-r from-transparent via-white/[0.07] to-transparent" />;
+function PosScreen() {
+  const items: [string, string, number][] = [
+    ['Yerba Taragüi 1 kg', '1 ×', 4850],
+    ['Coca-Cola 2,25 L', '2 ×', 6400],
+    ['Pan francés', '0,750 kg', 2250],
+    ['Queso cremoso', '0,320 kg', 3520],
+  ];
+  const total = items.reduce((s, [, , v]) => s + v, 0);
+  return (
+    <Screen title="Punto de venta · Caja 1">
+      <div className="p-4 sm:p-5">
+        <div className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-ink-3 mb-4">
+          <ScanBarcode size={16} className="text-teal" /> Escaneá o buscá un producto
+        </div>
+        {/* Los productos entran de a uno, como si se fueran escaneando */}
+        <motion.ul className="divide-y divide-line text-sm" initial="hidden" whileInView="show" viewport={{ once: true }}
+          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.28, delayChildren: 0.6 } } }}>
+          {items.map(([name, qty, value]) => (
+            <motion.li key={name} variants={{ hidden: { opacity: 0, x: -12 }, show: { opacity: 1, x: 0, transition: { duration: 0.35, ease: EASE } } }}
+              className="flex items-baseline justify-between gap-3 py-2">
+              <span className="text-ink">{name} <span className="text-ink-3">· {qty}</span></span>
+              <span className="tabular-nums font-medium text-ink">{priceFormatter.format(value)}</span>
+            </motion.li>
+          ))}
+        </motion.ul>
+        <div className="mt-3 flex items-baseline justify-between border-t-2 border-ink pt-3">
+          <span className="font-semibold">Total</span>
+          <span className="font-display text-2xl font-bold tabular-nums">{priceFormatter.format(total)}</span>
+        </div>
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-semibold">
+          {([
+            ['Efectivo', <Banknote key="e" size={16} />],
+            ['QR', <MpIcon key="q" size={20} />],
+            ['Transferencia', <Landmark key="t" size={16} />],
+            ['Fiado', <NotebookPen key="f" size={16} />],
+          ] as [string, React.ReactNode][]).map(([m, icon], i) => (
+            <span key={m} className={`flex flex-col items-center gap-1 rounded-md border px-2 py-2 text-center ${i === 1 ? 'border-[#00a6e0] bg-[#e6f7fd] text-ink' : 'border-line text-ink-2'}`}>
+              {icon}{m}
+            </span>
+          ))}
+        </div>
+      </div>
+    </Screen>
+  );
 }
 
-const sectionScripts: Record<string, string> = {
-  features: 'Yo tengo todo lo que necesitás en un solo lugar, punto de venta, inventario, cobros por WhatsApp, comandos de voz, y soy tu asistente de inteligencia artificial. Todo lo que necesitás para laburar tranquilo y sin vueltas.',
-  whatsapp: '¿Cuánta plata perdés porque no podés cobrarle a los clientes a tiempo? Yo genero el mensaje de cobro en un clic y lo mandamos por WhatsApp al toque, tu cliente ve exactamente lo que debe, y vos cobrás más rápido. Así de simple.',
-  voice: 'Imaginá manejar tu negocio entero sin tocar una sola tecla. Solo decime Gesto, y yo me encargo del resto, agregá productos, cobrá, creá stock y navegá entre secciones, todo con tu voz. Re cómodo para cuando tenés las manos ocupadas.',
-  ai: 'No hace falta que seas contador ni que entiendas de marketing. Preguntame cualquier cosa sobre tus ventas, tu stock o tus deudas, y te doy el análisis al toque. Soy tu analista de negocios, disponible las veinticuatro horas.',
-  inventory: 'Te doy control total del stock, productos por unidad o por peso, y te aviso cuando te quedás sin mercadería. Tengo más de treinta y siete mil productos listos para escanear. Nunca más te va a faltar nada en el mostrador.',
-  pos: 'Con mi punto de venta cobrás al toque. Escaneás el código, elegís cómo cobrar y listo, efectivo, Mercado Pago, QR o fiado. Me adapto a como laburás vos, no al revés.',
-  plans: 'Podés arrancar gratis hoy mismo, sin tarjeta ni compromisos. Y a medida que tu negocio crezca, yo crezco con vos.',
-  cta: 'Dale, ¿qué esperás? Registrate ahora y empezá a gestionar tu comercio conmigo. Te aseguro que no te voy a fallar.',
-};
+function CashScreen() {
+  const rows: [string, number][] = [['Apertura', 20000], ['Ventas en efectivo', 184300], ['Retiro (proveedor)', -45000]];
+  return (
+    <Screen title="Caja · Turno mañana">
+      <div className="p-4 sm:p-5 text-sm">
+        <ul className="space-y-2">
+          {rows.map(([label, value]) => (
+            <li key={label} className="flex justify-between">
+              <span className="text-ink-2">{label}</span>
+              <span className={`tabular-nums font-medium ${value < 0 ? 'text-orange' : 'text-ink'}`}>{priceFormatter.format(value)}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-3 flex justify-between border-t border-line pt-3 font-semibold">
+          <span>Debería haber</span><span className="tabular-nums">{priceFormatter.format(159300)}</span>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+          {[['QR', 96200], ['Transf.', 58700], ['Fiado', 12400]].map(([l, v]) => (
+            <div key={l} className="rounded-md bg-paper px-2 py-2">
+              <div className="text-ink-3">{l}</div>
+              <div className="tabular-nums font-semibold text-ink">{priceFormatter.format(Number(v))}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+function StockScreen() {
+  const rows: [string, string, 'ok' | 'low' | 'out'][] = [
+    ['Coca-Cola 2,25 L', '48 u', 'ok'],
+    ['Pan lactal Bimbo', '6 u', 'low'],
+    ['Asado', '3,8 kg', 'ok'],
+    ['Leche La Serenísima 1 L', '2 u', 'out'],
+    ['Queso cremoso', '1,2 kg', 'low'],
+  ];
+  const style = { ok: 'text-ink-2', low: 'text-orange font-semibold', out: 'text-red-700 font-semibold' };
+  return (
+    <Screen title="Inventario">
+      <motion.ul className="divide-y divide-line text-sm" initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.4 }}
+        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.12, delayChildren: 0.3 } } }}>
+        {rows.map(([name, qty, level]) => (
+          <motion.li key={name} variants={{ hidden: { opacity: 0, x: 12 }, show: { opacity: 1, x: 0, transition: { duration: 0.35, ease: EASE } } }}
+            className="flex items-center justify-between px-4 sm:px-5 py-2.5">
+            <span className="text-ink">{name}</span>
+            <span className={`tabular-nums ${style[level]}`}>{qty}{level !== 'ok' && ' · reponer'}</span>
+          </motion.li>
+        ))}
+      </motion.ul>
+    </Screen>
+  );
+}
+
+function WhatsAppMessage() {
+  const rows: [string, string, boolean][] = [['05/05', '$ 2.800', false], ['12/05', '$ 1.500', false], ['18/05 · pago', '− $ 2.000', true], ['28/05', '$ 3.200', false]];
+  return (
+    <div className="mx-auto max-w-sm overflow-hidden rounded-xl shadow-[0_12px_32px_-12px_rgba(28,38,40,0.25)]">
+      <div className="flex items-center gap-3 bg-[#075e54] px-4 py-3 text-white">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-sm font-semibold">MG</div>
+        <div className="flex-1">
+          <div className="text-sm font-semibold">María González</div>
+          <div className="text-xs text-white/70">Cliente · fiado</div>
+        </div>
+        <WhatsAppGlyph size={22} />
+      </div>
+    <div className="bg-[#e7ddd3] p-4 sm:p-5">
+      {/* Primero llega el resumen y después contesta el cliente, como en un chat */}
+      <motion.div initial={{ opacity: 0, y: 14, scale: 0.97 }} whileInView={{ opacity: 1, y: 0, scale: 1 }} viewport={{ once: true, amount: 0.4 }}
+        transition={{ duration: 0.45, delay: 0.3, ease: EASE }} style={{ transformOrigin: 'top left' }}
+        className="rounded-lg rounded-tl-none bg-white p-4 text-sm text-ink shadow-sm">
+        <p className="font-semibold mb-1">Hola María, ¿cómo estás?</p>
+        <p className="text-ink-2 mb-3">Te paso el resumen de tu cuenta en Almacén Don Luis:</p>
+        <ul className="space-y-1 mb-3 tabular-nums">
+          {rows.map(([d, v, paid]) => (
+            <li key={d} className="flex justify-between"><span className="text-ink-3">{d}</span><span className={paid ? 'text-teal' : ''}>{v}</span></li>
+          ))}
+        </ul>
+        <p className="flex justify-between border-t border-line pt-2 font-semibold"><span>Total</span><span className="tabular-nums">$ 5.500</span></p>
+        <p className="mt-1 text-right text-[11px] text-ink-3">10:32</p>
+      </motion.div>
+      <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} whileInView={{ opacity: 1, y: 0, scale: 1 }} viewport={{ once: true, amount: 0.4 }}
+        transition={{ duration: 0.4, delay: 1.4, ease: EASE }} style={{ transformOrigin: 'top right' }}
+        className="mt-2 ml-auto w-fit rounded-lg rounded-tr-none bg-[#d9fdd3] px-3 py-2 text-sm text-ink shadow-sm">
+        ¡Gracias! Paso mañana y te lo dejo.
+      </motion.div>
+    </div>
+    </div>
+  );
+}
+
+/* ── Vistas "en vivo" (sección oscura) ── */
+
+const LIVE_EVENTS: { icon: 'mp' | 'cash' | 'transfer' | 'wa' | 'stock'; text: string; amount?: string; where: string }[] = [
+  { icon: 'mp', text: 'Pago QR aprobado', amount: '$ 6.400', where: 'Caja 1 · mostrador' },
+  { icon: 'cash', text: 'Venta en efectivo', amount: '$ 2.250', where: 'Caja 2 · celular' },
+  { icon: 'stock', text: 'Leche La Serenísima: quedan 2', where: 'Inventario' },
+  { icon: 'transfer', text: 'Transferencia confirmada', amount: '$ 11.300', where: 'Caja 1 · mostrador' },
+  { icon: 'wa', text: 'Resumen enviado a María G.', where: 'Fiados' },
+  { icon: 'mp', text: 'Pago QR aprobado', amount: '$ 3.520', where: 'Caja 2 · celular' },
+];
+
+function LiveIcon({ kind }: { kind: (typeof LIVE_EVENTS)[number]['icon'] }) {
+  const box = 'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg';
+  if (kind === 'mp') return <span className={`${box} bg-white`}><MpIcon size={20} /></span>;
+  if (kind === 'wa') return <span className={box} style={{ background: WA_GREEN, color: 'white' }}><WhatsAppGlyph size={16} /></span>;
+  if (kind === 'cash') return <span className={`${box} bg-emerald-400/15 text-emerald-300`}><Banknote size={16} /></span>;
+  if (kind === 'transfer') return <span className={`${box} bg-sky-400/15 text-sky-300`}><Landmark size={16} /></span>;
+  return <span className={`${box} bg-orange/20 text-orange`}><Bell size={16} /></span>;
+}
+
+function LiveFeed() {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick(v => v + 1), 2600);
+    return () => clearInterval(t);
+  }, []);
+  // Los 4 eventos más recientes, el último arriba
+  const visible = Array.from({ length: 4 }, (_, i) => {
+    const n = tick - i;
+    return { ...LIVE_EVENTS[((n % LIVE_EVENTS.length) + LIVE_EVENTS.length) % LIVE_EVENTS.length], key: n };
+  });
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      <div className="mb-3 flex items-center justify-between text-xs">
+        <span className="font-semibold text-white/80">Actividad del negocio</span>
+        <span className="flex items-center gap-1.5 text-emerald-300">
+          <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1.6, repeat: Infinity }} className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          en vivo
+        </span>
+      </div>
+      {/* Alto fijo (4 filas de h-14 + 3 huecos de 8px) y salida en popLayout: la fila que sale no ocupa lugar,
+          así la lista nunca cambia de tamaño ni empuja el contenido de abajo */}
+      <ul className="relative m-0 flex h-[248px] list-none flex-col gap-2 overflow-hidden p-0">
+        <AnimatePresence initial={false} mode="popLayout">
+          {visible.map(e => (
+            <motion.li key={e.key} layout initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }}
+              className="flex h-14 flex-shrink-0 items-center gap-3 rounded-lg bg-white/[0.04] px-3">
+              <LiveIcon kind={e.icon} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm text-white">{e.text}</div>
+                <div className="text-xs text-white/50">{e.where}</div>
+              </div>
+              {e.amount && <span className="font-mono text-sm tabular-nums text-white">{e.amount}</span>}
+            </motion.li>
+          ))}
+        </AnimatePresence>
+      </ul>
+    </div>
+  );
+}
+
+function DevicesView() {
+  return (
+    <div className="relative grid grid-cols-[1fr_auto] items-end gap-4">
+      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+        <div className="mb-2 flex items-center gap-2 text-xs text-white/60"><Laptop size={14} /> Caja 1 · Compu del mostrador</div>
+        <div className="space-y-1.5 rounded-lg bg-[#0f1a1c] p-3 font-mono text-[11px] text-white/70">
+          <div className="flex justify-between"><span>Yerba Taragüi 1 kg</span><span>4.850</span></div>
+          <div className="flex justify-between"><span>Coca-Cola 2,25 L ×2</span><span>6.400</span></div>
+          <div className="flex justify-between border-t border-white/10 pt-1.5 text-white"><span>TOTAL</span><span>11.250</span></div>
+        </div>
+      </div>
+      <div className="w-28 rounded-2xl border border-white/10 bg-white/[0.04] p-2">
+        <div className="mb-1.5 flex items-center gap-1 text-[10px] text-white/60"><Smartphone size={11} /> Caja 2</div>
+        <div className="space-y-1 rounded-lg bg-[#0f1a1c] p-2 font-mono text-[10px] text-white/70">
+          <div>Pan 0,750 kg</div>
+          <div className="text-white">$ 2.250</div>
+          <div className="mt-1 rounded bg-emerald-400/20 px-1 py-0.5 text-center text-emerald-300">Cobrado</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const VOICE_LINES: [string, string][] = [
+  ['agregame 3 Coca Cola', 'Agregado: 3 × Coca-Cola 2,25 L · $ 9.600'],
+  ['¿cuánto sale la yerba?', 'Yerba Taragüi 1 kg: $ 4.850 · quedan 14'],
+  ['fiar a María González', 'Venta a cuenta de María G. · total $ 7.700'],
+  ['cobrar en efectivo', 'Cobrado $ 11.250 en efectivo · vuelto $ 750'],
+];
+
+function VoiceConsole() {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI(v => (v + 1) % VOICE_LINES.length), 3400);
+    return () => clearInterval(t);
+  }, []);
+  const [said, result] = VOICE_LINES[i];
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
+      <div className="flex items-center gap-4">
+        <div className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-orange text-ink">
+          <Mic size={20} />
+          <motion.span animate={{ scale: [1, 1.5], opacity: [0.5, 0] }} transition={{ duration: 1.6, repeat: Infinity }} className="absolute inset-0 rounded-full border-2 border-orange" />
+        </div>
+        <div className="flex h-10 flex-1 items-center gap-[3px]" aria-hidden="true">
+          {Array.from({ length: 32 }, (_, k) => (
+            <motion.span key={k} className="w-[3px] flex-1 rounded-full bg-teal-soft/70" style={{ height: 6 + ((k * 37) % 28) }}
+              animate={{ scaleY: [0.3, 1, 0.3] }} transition={{ duration: 1 + (k % 5) * 0.15, repeat: Infinity, delay: (k % 7) * 0.08 }} />
+          ))}
+        </div>
+      </div>
+      {/* El alto mínimo va en un contenedor fijo: con mode="wait" hay un instante sin contenido y no debe achicarse */}
+      <div className="mt-5 min-h-[136px] sm:min-h-[104px]">
+      <AnimatePresence mode="wait">
+        <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.3 }} className="space-y-3">
+          <p className="m-0 text-lg text-white"><span className="text-white/50">"Gesto,</span> {said}<span className="text-white/50">"</span></p>
+          <p className="m-0 flex items-center gap-2 rounded-lg bg-emerald-400/10 px-3 py-2 font-mono text-sm text-emerald-200">
+            <Check size={15} className="flex-shrink-0" /> {result}
+          </p>
+        </motion.div>
+      </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+/* ── Página ── */
 
 export function Landing() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const transcriptRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const isFromApp = Boolean((location.state as { fromApp?: boolean } | null)?.fromApp);
-  const palette = {
-    logoGradient: 'from-blue-600 to-cyan-600',
-    navGradient: 'from-slate-900/95 to-slate-800/95',
+  const [voiceOn, setVoiceOn] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const spokenRef = useRef(new Set<string>());
+
+  // La voz solo suena si la persona la activa: presentación + una narración por sección al llegar a ella
+  const toggleVoice = () => {
+    window.speechSynthesis?.cancel();
+    if (voiceOn) { setVoiceOn(false); return; }
+    setVoiceOn(true);
+    speak(INTRO_SPEECH, 1.15, 'male');
   };
 
-  // Canvas particles
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    let W = 0, H = 0, animFrame: number;
-    interface P { x: number; y: number; vx: number; vy: number; r: number; alpha: number; color: string }
-    let particles: P[] = [];
-    function resize() { W = canvas!.width = window.innerWidth; H = canvas!.height = window.innerHeight; }
-    function mkP(): P { return { x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - 0.5) * 0.25, vy: (Math.random() - 0.5) * 0.25, r: Math.random() * 1.2 + 0.4, alpha: Math.random() * 0.35 + 0.05, color: Math.random() > 0.5 ? '96,165,250' : '34,211,238' }; }
-    function init() { particles = Array.from({ length: 80 }, mkP); }
-    function loop() {
-      ctx!.clearRect(0, 0, W, H);
-      particles.forEach(p => {
-        p.x += p.vx; p.y += p.vy;
-        if (p.x < 0 || p.x > W || p.y < 0 || p.y > H) Object.assign(p, mkP());
-        ctx!.beginPath(); ctx!.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx!.fillStyle = `rgba(${p.color},${p.alpha})`; ctx!.fill();
-      });
-      for (let i = 0; i < particles.length; i++) for (let j = i + 1; j < particles.length; j++) {
-        const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y, d = Math.sqrt(dx * dx + dy * dy);
-        if (d < 90) { ctx!.beginPath(); ctx!.moveTo(particles[i].x, particles[i].y); ctx!.lineTo(particles[j].x, particles[j].y); ctx!.strokeStyle = `rgba(96,165,250,${0.04 * (1 - d / 90)})`; ctx!.lineWidth = 0.5; ctx!.stroke(); }
-      }
-      animFrame = requestAnimationFrame(loop);
-    }
-    const onResize = () => { resize(); init(); };
-    resize(); init(); loop();
-    window.addEventListener('resize', onResize);
-    return () => { cancelAnimationFrame(animFrame); window.removeEventListener('resize', onResize); };
-  }, []);
-
-  // Voice transcript
-  useEffect(() => {
-    const lines: [string, string][] = [
-      ['Gesto, ', 'agregame 3 Coca Cola'],
-      ['Gesto, ', 'cobrar en efectivo'],
-      ['Gesto, ', 'fiar a María González'],
-      ['Gesto, ', 'nuevo producto Yerba Taragüi'],
-      ['Gesto, ', '¿cuánto sale el asado?'],
-    ];
-    let i = 0;
-    const t = setInterval(() => {
-      i = (i + 1) % lines.length;
-      if (transcriptRef.current) {
-        const [pre, hl] = lines[i];
-        transcriptRef.current.innerHTML = `"${pre}<span style="color:#22d3ee;font-style:normal;font-weight:600">${hl}</span>"`;
-      }
-    }, 3000);
-    return () => clearInterval(t);
-  }, []);
-
-  const scrollTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-    if (sectionScripts[id]) {
-      window.speechSynthesis?.cancel();
-      setTimeout(() => speak(sectionScripts[id], 1.22, 'male'), 600);
-    }
-  };
-
-  // Narración introductoria al cargar
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      speak('Hola, soy Gesto. El sistema de gestión que tu comercio necesitaba. Estoy acá para que labures menos y vendas más, para que tengas todo controlado desde un solo lugar, y nunca más pierdas plata por no tener el inventario al día. Dale, mirá todo lo que puedo hacer por vos.', 1.22, 'male');
-    }, 800);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Narración por sección al hacer scroll
-  useEffect(() => {
-    const scripts = sectionScripts;
-
-    const spoken = new Set<string>();
-    const observer = new IntersectionObserver((entries) => {
+    if (!voiceOn) return;
+    const observer = new IntersectionObserver(entries => {
       entries.forEach(e => {
         const id = (e.target as HTMLElement).id;
-        if (e.isIntersecting && id && scripts[id] && !spoken.has(id)) {
-          spoken.add(id);
+        if (e.isIntersecting && SECTION_SPEECH[id] && !spokenRef.current.has(id)) {
+          spokenRef.current.add(id);
           window.speechSynthesis?.cancel();
-          setTimeout(() => speak(scripts[id], 1.22, 'male'), 400);
+          speak(SECTION_SPEECH[id], 1.15, 'male');
         }
       });
-    }, { threshold: 0.4 });
-
-    const ids = Object.keys(scripts);
-    ids.forEach(id => {
+    }, { threshold: 0.35 });
+    Object.keys(SECTION_SPEECH).forEach(id => {
       const el = document.getElementById(id);
       if (el) observer.observe(el);
     });
-
     return () => observer.disconnect();
-  }, []);
+  }, [voiceOn]);
+
+  useEffect(() => () => window.speechSynthesis?.cancel(), []);
+
+  // Ir a una sección desde el menú: se vuelve a montar su contenido y la animación de entrada se repite
+  const [replay, setReplay] = useState<Record<string, number>>({});
+  const goTo = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    setReplay(r => ({ ...r, [id]: (r[id] ?? 0) + 1 }));
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    history.replaceState(null, '', `#${id}`);
+  };
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden" style={{ background: 'linear-gradient(160deg,#0f172a 0%,#0c1a2e 40%,#0f172a 100%)', color: '#e2e8f0', fontFamily: "'Segoe UI',system-ui,-apple-system,sans-serif" }}>
+    <ReplayContext.Provider value={replay}>
+    <MotionConfig reducedMotion="user">
+      {/* overflow-x-clip (no hidden): hidden rompe el position: sticky del navbar */}
+      <div className="min-h-screen overflow-x-clip bg-paper text-ink">
 
-      <canvas ref={canvasRef} className="fixed inset-0 w-full h-full pointer-events-none z-0 opacity-60" />
-      <div className="fixed inset-0 z-0 pointer-events-none opacity-[0.025]" style={{ backgroundImage: 'linear-gradient(rgba(96,165,250,1) 1px,transparent 1px),linear-gradient(90deg,rgba(96,165,250,1) 1px,transparent 1px)', backgroundSize: '80px 80px' }} />
-
-      {/* ── NAV ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-8 lg:px-10 xl:px-12 py-3 border-b border-white/[0.06]"
-        style={{ background: 'rgba(15,23,42,0.9)', backdropFilter: 'blur(16px)' }}>
-        <div className="flex items-center gap-3">
-          {isFromApp && (
-            <motion.button onClick={() => navigate(-1)} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-              whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.94 }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[0.75rem] font-semibold border cursor-pointer border-blue-500/40 text-blue-400"
-              style={{ background: 'rgba(59,130,246,0.1)' }}>
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11L4 7l5-4" /></svg>
-              Volver
-            </motion.button>
-          )}
-          <div className="flex items-center gap-2.5">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-              className={`w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br ${palette.logoGradient} rounded-xl flex items-center justify-center shadow-lg`}
-            >
-              <img src="/imgs/Logo-Gesto.png" alt="Gesto" className="w-7 h-7 sm:w-8 sm:h-8 object-contain" />
-            </motion.div>
-            <div className="hidden sm:block">
-              <h1 className="text-xl sm:text-2xl font-bold text-shimmer">Gesto</h1>
-              <p className="text-xs text-slate-200">e-Commerce Interno</p>
+        {/* ── NAV ── */}
+        <header className="sticky top-0 z-50 border-b border-line/80 bg-paper/90 backdrop-blur">
+          <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 py-3">
+            <div className="flex items-center gap-3">
+              {isFromApp && (
+                <button onClick={() => navigate(-1)} className="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-2 hover:bg-paper-2 cursor-pointer bg-transparent">
+                  ← Volver
+                </button>
+              )}
+              <a href="#top" className="flex items-center gap-2 no-underline">
+                <motion.img src="/imgs/Logo-Gesto.png" alt="" className="h-8 w-8 object-contain"
+                  initial={{ opacity: 0, scale: 0.6, rotate: -20 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} transition={{ duration: 0.6, ease: EASE }} />
+                <motion.span initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.15, ease: EASE }}
+                  className="font-display text-xl font-bold text-ink">Gesto</motion.span>
+              </a>
             </div>
-            <div className="sm:hidden">
-              <h1 className="text-lg font-bold text-shimmer">Gesto</h1>
-            </div>
-          </div>
-        </div>
-
-        <ul className="hidden lg:flex gap-6 xl:gap-8 list-none m-0 p-0 items-center">
-          {[['features','Funciones'],['whatsapp','WhatsApp'],['voice','Voz & IA'],['pos','POS'],['plans','Planes']].map(([id, label]) => (
-            <li key={id}><button onClick={() => scrollTo(id)} className="text-slate-400 hover:text-white text-[0.85rem] font-medium transition-colors bg-transparent border-none cursor-pointer">{label}</button></li>
-          ))}
-          <li>
-            <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => window.open(APP_LOGIN_URL, '_blank')}
-              className="px-5 py-2 rounded-xl text-sm font-semibold text-white border border-blue-500/40"
-              style={{ background: 'linear-gradient(135deg,#1d4ed8,#0891b2)' }}>
-              Empezar ahora
-            </motion.button>
-          </li>
-        </ul>
-
-        <motion.button whileTap={{ scale: 0.95 }} onClick={() => window.open(APP_LOGIN_URL, '_blank')}
-          className="lg:hidden px-4 py-1.5 rounded-xl text-[0.8rem] font-semibold text-white border border-blue-500/40"
-          style={{ background: 'linear-gradient(135deg,#1d4ed8,#0891b2)' }}>
-          Empezar
-        </motion.button>
-      </nav>
-
-      {/* ── HERO ── */}
-      <section id="hero" className="relative z-10 min-h-screen flex flex-col items-center justify-center text-center px-5 sm:px-8 lg:px-12 xl:px-16 pt-24 sm:pt-32 pb-16">
-        <div className="absolute top-20 left-1/4 w-[400px] h-[400px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle,rgba(29,78,216,0.18) 0%,transparent 70%)', filter: 'blur(60px)' }} />
-        <div className="absolute bottom-20 right-1/4 w-[400px] h-[400px] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle,rgba(8,145,178,0.15) 0%,transparent 70%)', filter: 'blur(60px)' }} />
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[0.72rem] font-semibold uppercase tracking-wider mb-6 border border-blue-500/30 text-blue-300"
-          style={{ background: 'rgba(29,78,216,0.12)' }}>
-          <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1.8, repeat: Infinity }} className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-          <span className="hidden sm:inline">Sistema de gestión inteligente para comercios</span>
-          <span className="sm:hidden">Gestión inteligente para comercios</span>
-        </motion.div>
-
-        <motion.img
-          src="/imgs/Logo-Gesto.png"
-          alt="Gesto"
-          initial={{ opacity: 0, scale: 0.85 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.05 }}
-          className="object-contain mb-4 drop-shadow-2xl"
-          style={{ width: 'clamp(80px,12vw,130px)', height: 'clamp(80px,12vw,130px)' }}
-        />
-
-        <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.1 }}
-          className="font-black leading-[1.05] tracking-tight mb-5" style={{ fontSize: 'clamp(2.5rem,7vw,5.5rem)' }}>
-          <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">El comercio</span><br />
-          <span className="text-white">del futuro,</span><br />
-          <span className="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">hoy.</span>
-        </motion.h1>
-
-        <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.2 }}
-          className="text-slate-400 max-w-xl leading-relaxed mb-8 text-[0.95rem] sm:text-base lg:text-lg">
-          Gesto transforma cualquier negocio en una operación de alto rendimiento. Punto de venta, inventario inteligente, cobranzas por WhatsApp, voz y asistente de IA — todo en una sola plataforma.
-        </motion.p>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.3 }}
-          className="flex gap-3 flex-wrap justify-center mb-12">
-          <motion.button whileHover={{ scale: 1.03, boxShadow: '0 0 30px rgba(29,78,216,0.5)' }} whileTap={{ scale: 0.97 }}
-            onClick={() => window.open(APP_LOGIN_URL, '_blank')}
-            className="px-7 sm:px-9 py-3 sm:py-3.5 rounded-xl font-bold text-sm sm:text-base text-white border-none cursor-pointer shadow-lg"
-            style={{ background: 'linear-gradient(135deg,#1d4ed8,#0891b2)' }}>
-            Comenzar gratis
-          </motion.button>
-          <motion.button whileHover={{ borderColor: 'rgba(96,165,250,0.5)', color: '#93c5fd' }} onClick={() => scrollTo('features')}
-            className="px-7 sm:px-9 py-3 sm:py-3.5 rounded-xl font-semibold text-sm sm:text-base text-slate-300 bg-transparent border border-white/10 cursor-pointer transition-colors">
-            Ver funciones
-          </motion.button>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.4 }}
-          className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-4">
-          {[['4','Métodos de pago'],['∞','Productos'],['IA','Asistente incluido'],['0%','Código requerido']].map(([num, label]) => (
-            <div key={label} className="text-center">
-              <div className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">{num}</div>
-              <div className="text-[0.7rem] text-slate-500 uppercase tracking-wider mt-1">{label}</div>
-            </div>
-          ))}
-        </motion.div>
-
-      </section>
-
-      {/* ── FEATURES ── */}
-      <section id="features" className="relative z-10 max-w-[1200px] lg:max-w-[1400px] xl:max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 py-16 sm:py-24">
-        <Reveal>
-          <SectionTitle tag="Todo en uno" title={<>Cada herramienta que<br />tu negocio <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">necesita</span></>} desc="Diseñado para comercios reales: almacenes, verdulerías, carnicerías, panaderías y más." />
-        </Reveal>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
-          {/* Mercado Pago — ancho col-span-2 */}
-          <Reveal className="sm:col-span-2 lg:col-span-2">
-            <Card className="p-6 sm:p-8 h-full border-sky-500/20">
-              <div className="flex items-start gap-5">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 bg-white/40 backdrop-blur-sm border border-white/30 p-2">
-                  <img src="/imgs/Logotipo_de_Mercado_Pago_alternativo.webp" alt="Mercado Pago" className="w-full object-contain" />
-                </div>
-                <div>
-                  <div className="text-lg font-bold text-white mb-2">Mercado Pago Integrado</div>
-                  <div className="text-[0.88rem] text-slate-400 leading-relaxed mb-4">QR dinámico por transacción, QR estático imprimible y cobro por efectivo. Confirmación de pago en tiempo real sin salir de Gesto.</div>
-                  <div className="flex flex-wrap gap-1.5">{[['QR dinámico','blue'],['QR estático','cyan'],['Efectivo','green']].map(([t,c]) => <Tag key={t} label={t} color={c} />)}</div>
-                </div>
-              </div>
-            </Card>
-          </Reveal>
-
-          {/* Asistente IA — tall row-span-2 */}
-          <Reveal className="sm:col-span-2 lg:col-span-1 lg:row-span-2">
-            <Card className="p-6 sm:p-7 h-full border-fuchsia-500/20 flex flex-col">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl mb-5 bg-fuchsia-900/40 border border-fuchsia-700/30">🤖</div>
-              <div className="text-lg font-bold text-white mb-3">Asistente de IA</div>
-              <div className="text-[0.88rem] text-slate-400 leading-relaxed flex-1 mb-5">La IA que conoce tu negocio. Hoy todos usan IA, pero ninguna sabe el día a día de tu comercio. Gesto sí. Tu contador, analista de marketing e inventarista en uno. Hacé preguntas en lenguaje natural sobre ventas, deudas, stock y tendencias. Disponible las 24 horas.</div>
-              <div className="flex flex-wrap gap-1.5">{[['Groq AI','purple'],['Análisis','cyan'],['Marketing','green'],['Contador','blue']].map(([t,c]) => <Tag key={t} label={t} color={c} />)}</div>
-            </Card>
-          </Reveal>
-
-          {/* WhatsApp — ancho col-span-2 */}
-          <Reveal className="sm:col-span-2 lg:col-span-2">
-            <Card className="p-6 sm:p-8 h-full border-emerald-500/20">
-              <div className="flex items-start gap-5">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 bg-white/20 backdrop-blur-sm border border-white/20">
-                  <WhatsAppIcon sx={{ fontSize: 32, color: '#22c55e' }} />
-                </div>
-                <div>
-                  <div className="text-lg font-bold text-white mb-2">Cobros por WhatsApp</div>
-                  <div className="text-[0.88rem] text-slate-400 leading-relaxed mb-4">Generá automáticamente mensajes de cobro con resumen de deuda e historial de pagos. Un solo clic y el mensaje llega directo al cliente.</div>
-                  <div className="flex flex-wrap gap-1.5">{[['Auto-mensaje','green'],['Historial','blue'],['1 click','cyan']].map(([t,c]) => <Tag key={t} label={t} color={c} />)}</div>
-                </div>
-              </div>
-            </Card>
-          </Reveal>
-
-          {/* Cards normales */}
-          {[
-            { icon: '🛒', title: 'Punto de Venta Ultrarrápido', desc: 'Procesá ventas con escáner láser, cámara QR o búsqueda por nombre. Carrito inteligente en tiempo real.', tags: [['Escáner','cyan'],['Cámara QR','blue'],['Tiempo real','green']] },
-            { icon: '📦', title: 'Inventario Inteligente', desc: 'Control de stock por unidad o por peso. Alertas de stock mínimo y secciones especializadas.', tags: [['Peso / unidad','green'],['Alertas','orange'],['Secciones','blue']] },
-            { icon: '🎤', title: 'Control por Voz', desc: 'Decí "Gesto" y manejá carrito, inventario, cobros y navegación completamente manos libres.', tags: [['Manos libres','cyan'],['Pro / Enterprise','purple']] },
-            { icon: '📊', title: 'Dashboard en Tiempo Real', desc: 'Ventas del día, caja, deudas vencidas, stock bajo y recupero de fiados de un vistazo.', tags: [['Diario','orange'],['Fiados','cyan'],['Alertas','green']] },
-            { icon: '⏸️', title: 'Ventas en Espera', desc: 'Pausá la venta, atendé otro cliente y volvé. Guardado automático para no perder nada.', tags: [['Multipago','blue'],['Auto-guardado','green']] },
-          ].map(({ icon, title, desc, tags }, i) => (
-            <Reveal key={title} delay={i * 0.04}>
-              <Card className="p-5 sm:p-6 h-full">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl mb-4 bg-blue-900/40 border border-blue-700/30">{icon}</div>
-                <div className="text-base font-bold text-white mb-2">{title}</div>
-                <div className="text-[0.83rem] text-slate-400 leading-relaxed mb-4">{desc}</div>
-                <div className="flex flex-wrap gap-1.5">{tags.map(([t, c]) => <Tag key={t} label={t} color={c} />)}</div>
-              </Card>
-            </Reveal>
-          ))}
-
-          {/* Próximamente */}
-          <Reveal>
-            <Card className="p-5 sm:p-6 h-full border-amber-500/20 relative overflow-hidden">
-              <div className="absolute top-3 right-3 text-[0.6rem] font-extrabold uppercase tracking-wider text-gray-900 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-400">Próximamente</div>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl mb-4 bg-amber-900/30 border border-amber-700/30">🧾</div>
-              <div className="text-base font-bold text-white mb-2">Mis Compras & Facturas</div>
-              <div className="text-[0.83rem] text-slate-400 leading-relaxed mb-4">Escaneá facturas de proveedores y Gesto actualiza el stock con OCR. Sin carga manual.</div>
-              <div className="flex flex-wrap gap-1.5">{[['OCR','orange'],['Stock auto','orange'],['Proveedores','blue']].map(([t, c]) => <Tag key={t} label={t} color={c} />)}</div>
-            </Card>
-          </Reveal>
-
-        </div>
-      </section>
-
-      <Divider />
-
-      {/* ── WHATSAPP ── */}
-      <section id="whatsapp" className="relative z-10 px-4 sm:px-8 lg:px-12 xl:px-16 py-16 sm:py-24">
-        <div className="max-w-[1100px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-          <Reveal className="flex justify-center order-first lg:order-none">
-            <div className="w-[260px] sm:w-[280px] rounded-[32px] border border-white/10 overflow-hidden shadow-2xl" style={{ background: '#0d1117' }}>
-              <div className="flex justify-between px-5 pt-3 pb-1.5 text-[0.62rem] text-slate-500 bg-slate-900/80"><span>9:41</span><span>▮▮▮ 📶 🔋</span></div>
-              <div className="flex items-center gap-2.5 px-4 py-2.5 bg-[#075e54]">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-emerald-700 text-sm flex-shrink-0">👤</div>
-                <div><div className="text-[0.82rem] font-semibold text-white">María González</div><div className="text-[0.62rem] text-emerald-200/70">en línea</div></div>
-              </div>
-              <div className="px-3 py-3 flex flex-col gap-2.5 min-h-[320px] bg-[#0b1a17]">
-                <div className="rounded-xl rounded-bl-sm p-3 max-w-[90%] text-[0.7rem] leading-relaxed text-white/85 border-l-[2px] border-emerald-500 bg-[#1a3a30]">
-                  <div className="flex items-center gap-1 text-[0.62rem] font-bold text-emerald-400 mb-1"><WhatsAppIcon sx={{ fontSize: 11 }} /> Gesto — Resumen de cuenta</div>
-                  <div className="font-bold text-white text-[0.78rem] mb-1">Hola María 👋</div>
-                  <div className="text-[0.65rem] text-white/50 mb-2">Estado de cuenta actualizado:</div>
-                  {[['05 May','$2.800',false],['12 May','$1.500',false],['18 May Pago','-$2.000',true],['28 May','$3.200',false]].map(([d,v,paid]) => (
-                    <div key={String(d)} className="flex justify-between py-0.5 border-b border-white/[0.05] text-[0.65rem]"><span className="text-white/60">{String(d)}</span><span style={{ color: paid ? '#34d399' : '#f87171', fontWeight: 700 }}>{String(v)}</span></div>
-                  ))}
-                  <div className="flex justify-between mt-1.5 text-[0.68rem] font-bold text-white"><span>Total adeudado:</span><span className="text-red-400">$5.500</span></div>
-                  <div className="text-right text-[0.58rem] text-white/30 mt-1">10:32 ✓✓</div>
-                </div>
-                <div className="self-end rounded-xl rounded-br-sm px-3 py-2 max-w-[80%] text-[0.7rem] text-white/85 bg-[#005c4b]">
-                  Gracias! Paso mañana 😊<div className="text-right text-[0.58rem] text-white/30 mt-0.5">10:45 ✓✓</div>
-                </div>
-                <div className="rounded-xl rounded-bl-sm p-3 max-w-[90%] text-[0.7rem] text-white/85 border-l-[2px] border-emerald-500 bg-[#1a3a30]">
-                  <div className="flex items-center gap-1 text-[0.62rem] font-bold text-emerald-400 mb-1"><WhatsAppIcon sx={{ fontSize: 11 }} /> Pago registrado</div>
-                  Pago de <span className="text-emerald-400 font-bold">$5.500</span> recibido. Cuenta al día ✅
-                  <div className="text-right text-[0.58rem] text-white/30 mt-1">16:20 ✓✓</div>
-                </div>
-              </div>
-            </div>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <div className="flex items-center gap-5 mb-5">
-              <motion.div
-                animate={{ boxShadow: ['0 0 20px rgba(34,197,94,0.3)','0 0 50px rgba(34,197,94,0.7)','0 0 20px rgba(34,197,94,0.3)'] }}
-                transition={{ duration: 3, repeat: Infinity }}
-                className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl flex items-center justify-center flex-shrink-0 border border-emerald-500/30"
-                style={{ background: 'linear-gradient(135deg,rgba(21,128,61,0.3),rgba(5,46,22,0.5))' }}
-              >
-                <WhatsAppIcon sx={{ fontSize: 52, color: '#22c55e' }} />
-              </motion.div>
-              <div>
-                <div className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-emerald-400 mb-2">WhatsApp Integrado</div>
-                <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white">Cobros que<br /><span className="text-emerald-400">funcionan</span></h2>
-              </div>
-            </div>
-            <p className="text-slate-400 text-[0.9rem] leading-relaxed mb-5">Olvidáte de las anotaciones en cuaderno. Gesto genera automáticamente el mensaje de cobro perfecto con toda la información que el cliente necesita ver.</p>
-            <ul className="flex flex-col gap-3">
-              {[['Resumen detallado de deuda','Cada compra fiada con fecha, descripción y monto.'],['Historial de pagos','Muestra lo que ya pagó el cliente, generando confianza.'],['Total adeudado destacado','Sin ambigüedades, en un solo vistazo.'],['Un solo clic','El link de WhatsApp se abre con el mensaje listo para enviar.'],['Confirmación de pago','Cuando el cliente paga, podés avisarle automáticamente.'],['Límite de crédito','Definí cuánto puede deber cada persona.']].map(([b, r]) => (
-                <li key={b} className="flex items-start gap-3 text-[0.88rem] text-slate-400">
-                  <div className="mt-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[0.62rem] text-emerald-400 flex-shrink-0 border border-emerald-500/30 bg-emerald-900/30">✓</div>
-                  <div><strong className="text-slate-200">{b}</strong> — {r}</div>
-                </li>
+            <ul className="hidden lg:flex items-center gap-6 list-none m-0 p-0 text-sm font-medium">
+              {[['producto', 'Producto'], ['fiados', 'Fiados'], ['en-vivo', 'En vivo'], ['voz', 'Voz e IA'], ['planes', 'Planes'], ['preguntas', 'Preguntas']].map(([id, label]) => (
+                <li key={id}><a href={`#${id}`} onClick={e => goTo(e, id)} className="text-ink-2 no-underline hover:text-ink">{label}</a></li>
               ))}
             </ul>
-          </Reveal>
-        </div>
-      </section>
-
-      <Divider />
-
-      {/* ── VOICE ── */}
-      <section id="voice" className="relative z-10 max-w-[1100px] lg:max-w-[1200px] xl:max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 py-16 sm:py-24">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-          <Reveal>
-            <Card className="p-6 sm:p-8" hover={false}>
-              <motion.div animate={{ boxShadow: ['0 0 15px rgba(34,211,238,0.3)','0 0 35px rgba(34,211,238,0.6)','0 0 15px rgba(34,211,238,0.3)'] }} transition={{ duration: 3, repeat: Infinity }}
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full mx-auto mb-6 flex items-center justify-center text-2xl sm:text-3xl relative bg-gradient-to-br from-blue-900/60 to-cyan-900/60 border border-cyan-500/30">
-                🎤
-                <motion.div animate={{ scale: [1,1.12,1], opacity: [0.3,0.08,0.3] }} transition={{ duration: 3, repeat: Infinity }} className="absolute inset-[-8px] rounded-full border border-cyan-400/20" />
-                <motion.div animate={{ scale: [1,1.12,1], opacity: [0.2,0.05,0.2] }} transition={{ duration: 3, repeat: Infinity, delay: 1 }} className="absolute inset-[-18px] rounded-full border border-cyan-400/10" />
-              </motion.div>
-              <div className="flex justify-center items-center gap-1 h-8 mb-5">
-                {[10,20,30,24,36,28,16,12,24,30].map((h, i) => (
-                  <motion.div key={i} className="w-[3px] rounded-full bg-gradient-to-b from-blue-400 to-cyan-500" style={{ height: h }}
-                    animate={{ scaleY: [0.35,1,0.35], opacity: [0.4,1,0.4] }} transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.1, ease: 'easeInOut' }} />
-                ))}
-              </div>
-              <div ref={transcriptRef} className="text-center text-[0.82rem] text-slate-500 italic mb-5">
-                "Gesto, <span style={{ color: '#22d3ee', fontStyle: 'normal', fontWeight: 600 }}>agregame 3 Coca Cola</span>"
-              </div>
-              <div className="flex flex-col gap-2">
-                {[['"Gesto"',', sacame el pan'],['"Cobrar"',' en efectivo'],['"Fiar"',' a cliente'],['"Nuevo producto"',', Leche La Serenísima'],['"¿Cuánto sale"',' la harina?']].map(([kw, rest]) => (
-                  <div key={String(kw)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-[0.78rem] bg-blue-900/20 border border-blue-700/20">
-                    <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs flex-shrink-0 bg-cyan-900/40 border border-cyan-700/30">🎤</div>
-                    <span className="text-slate-400"><strong className="text-cyan-400">{kw}</strong>{rest}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <div className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-cyan-400 mb-3">Control por Voz</div>
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white mb-5">Trabajá con<br />las manos <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">libres</span></h2>
-            <p className="text-slate-400 text-[0.9rem] leading-relaxed mb-7">La palabra "Gesto" activa el asistente. Operá el punto de venta, creá productos, navegá entre secciones y consultá precios — todo sin tocar la pantalla.</p>
-            <div className="grid grid-cols-2 gap-3">
-              {[['🛒','Carrito','Agregar, quitar y cobrar'],['📦','Inventario','Crear productos por voz'],['🗺️','Navegación','Moverse entre módulos'],['💰','Cobros','Efectivo, QR, fiado']].map(([icon, name, desc]) => (
-                <motion.div key={String(name)} whileHover={{ borderColor: 'rgba(34,211,238,0.25)', background: 'rgba(14,116,144,0.12)' }} className="text-center p-3 sm:p-4 rounded-xl border border-white/[0.06] bg-slate-800/30 transition-all">
-                  <div className="text-xl sm:text-2xl mb-1.5">{icon}</div>
-                  <div className="text-[0.78rem] font-bold text-slate-200">{name}</div>
-                  <div className="text-[0.68rem] text-slate-500 mt-1">{desc}</div>
-                </motion.div>
-              ))}
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      <Divider />
-
-      {/* ── AI ── */}
-      <section id="ai" className="relative z-10 px-4 sm:px-8 lg:px-12 xl:px-16 py-16 sm:py-24" style={{ background: 'linear-gradient(180deg,transparent,rgba(88,28,135,0.06),transparent)' }}>
-        <div className="max-w-[1100px] lg:max-w-[1200px] xl:max-w-[1400px] mx-auto">
-          <Reveal>
-            <SectionTitle tag="Inteligencia Artificial" tagColor="text-fuchsia-400"
-              title={<>Tu negocio,<br /><span className="bg-gradient-to-r from-fuchsia-400 to-blue-400 bg-clip-text text-transparent">más inteligente</span></>}
-              desc="El asistente de IA de Gesto no es un chatbot genérico. Conoce tu inventario, tus ventas y tus clientes en tiempo real." />
-          </Reveal>
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-10 lg:gap-16 items-start">
-            <Reveal className="grid grid-cols-2 gap-3">
-              {[['📦','Inventarista','Consultas de stock, disponibilidad y ubicación por sección.'],['🧮','Contador','Análisis de ventas, ingresos, deudas y métodos de pago.'],['📈','Marketing','Productos más vendidos, stock muerto y tendencias.'],['🏪','General','Salud global del negocio y resúmenes ejecutivos.']].map(([icon, name, desc]) => (
-                <Card key={String(name)} className="p-4 sm:p-5">
-                  <div className="text-2xl sm:text-3xl mb-2">{icon}</div>
-                  <div className="text-[0.85rem] font-bold text-white mb-1">{name}</div>
-                  <div className="text-[0.75rem] text-slate-500 leading-relaxed">{desc}</div>
-                </Card>
-              ))}
-            </Reveal>
-            <Reveal delay={0.1}>
-              <Card className="overflow-hidden" hover={false}>
-                <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5 border-b border-white/[0.06] bg-fuchsia-900/20">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br from-fuchsia-600 to-blue-600 flex-shrink-0">✨</div>
-                  <div><div className="text-[0.88rem] font-bold text-white">Gesto IA</div><div className="text-[0.65rem] text-emerald-400">● En línea</div></div>
-                </div>
-                <div className="p-4 sm:p-5 flex flex-col gap-3">
-                  <div className="self-end max-w-[80%] rounded-2xl rounded-br-sm px-3 py-2.5 text-[0.78rem] text-white/85 bg-fuchsia-900/30 border border-fuchsia-700/25">¿Cuáles fueron mis productos más vendidos esta semana?</div>
-                  <div className="self-start max-w-[85%] rounded-2xl rounded-bl-sm px-3 py-2.5 text-[0.78rem] text-slate-300 leading-relaxed bg-blue-900/20 border border-blue-700/20">
-                    <div className="text-[0.6rem] font-bold uppercase tracking-wider text-fuchsia-400 mb-1.5">📈 Modo Marketing</div>
-                    Top 3 de la semana:<br /><br />
-                    <span className="text-cyan-400 font-bold">1.</span> Coca-Cola 2L — 47 uds<br />
-                    <span className="text-cyan-400 font-bold">2.</span> Pan lactal — 38 uds<br />
-                    <span className="text-cyan-400 font-bold">3.</span> Yerba Taragüi — 29 uds<br /><br />
-                    Bebidas = 34% del total 💡
-                  </div>
-                  <div className="self-end max-w-[80%] rounded-2xl rounded-br-sm px-3 py-2.5 text-[0.78rem] text-white/85 bg-fuchsia-900/30 border border-fuchsia-700/25">¿Cuánto me deben en fiados?</div>
-                  <div className="self-start max-w-[85%] rounded-2xl rounded-bl-sm px-3 py-2.5 text-[0.78rem] text-slate-300 leading-relaxed bg-blue-900/20 border border-blue-700/20">
-                    <div className="text-[0.6rem] font-bold uppercase tracking-wider text-fuchsia-400 mb-1.5">🧮 Modo Contador</div>
-                    Deuda activa: <strong className="text-rose-400">$48.200</strong><br />
-                    Vencida +30d: <strong className="text-amber-400">$12.800</strong> — 3 clientes<br />
-                    Recupero del mes: <strong className="text-emerald-400">$31.500</strong> ✅
-                  </div>
-                </div>
-                <div className="px-4 sm:px-5 py-3 border-t border-white/[0.06] flex items-center gap-2.5">
-                  <div className="flex-1 rounded-xl px-3 py-2 text-[0.75rem] text-slate-600 border border-white/[0.06] bg-slate-800/30">Preguntá lo que quieras...</div>
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs bg-gradient-to-br from-fuchsia-600 to-blue-600 flex-shrink-0">➤</div>
-                </div>
-              </Card>
-            </Reveal>
-          </div>
-        </div>
-      </section>
-
-      <Divider />
-
-      {/* ── INVENTORY ── */}
-      <section id="inventory" className="relative z-10 max-w-[1100px] lg:max-w-[1200px] xl:max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 py-16 sm:py-24">
-        <Reveal>
-          <SectionTitle tag="Inventario" tagColor="text-emerald-400"
-            title={<>Control total de<br />tu <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">stock</span></>}
-            desc="Desde unidades simples hasta productos al peso con secciones especializadas." />
-        </Reveal>
-        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-10 lg:gap-16 items-center">
-          <Reveal className="flex flex-col gap-3.5">
-            {[['⚖️','Productos al Peso','Soporte nativo para verdulería, carnicería y panadería. Stock en gramos o kilos.'],['🏷️','Base de +37.000 productos','Escaneá el código de barras y los datos se completan solos. Solo agregás precio y stock.'],['🔔','Alertas de Stock Mínimo','Definí el umbral por producto. El dashboard te avisa antes de quedarte sin stock.'],['🎤','Carga por Voz','Dictale los datos del producto: nombre, sección, costo, precio y stock.']].map(([icon, title, desc]) => (
-              <motion.div key={String(title)} whileHover={{ x: 4, borderColor: 'rgba(52,211,153,0.2)' }} className="flex items-start gap-4 p-4 rounded-2xl border border-white/[0.06] bg-gray-800/30 transition-all">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 bg-emerald-900/40 border border-emerald-700/30">{icon}</div>
-                <div><div className="text-[0.88rem] font-bold text-slate-200 mb-1">{title}</div><div className="text-[0.78rem] text-slate-500 leading-relaxed">{desc}</div></div>
-              </motion.div>
-            ))}
-          </Reveal>
-          <Reveal delay={0.1}>
-            <Card className="p-5 relative" hover={false}>
-              <div className="absolute -top-3 right-4 text-[0.62rem] font-bold uppercase tracking-wider text-white px-3 py-1 rounded-full bg-gradient-to-r from-blue-700 to-cyan-700">IA Integrada</div>
-              <div className="text-[0.68rem] text-slate-600 uppercase tracking-widest mb-3">Stock actual</div>
-              <div className="flex flex-col gap-2">
-                {[['🥤','Coca-Cola 2.25L','48 ud','ok'],['🍞','Pan lactal Bimbo','⚠ 6 ud','low'],['🥩','Asado c/hueso','3.8 kg','ok'],['🥛','Leche La Serenísima','🔴 2 ud','critical'],['🌿','Verdura de hoja x kg','12.4 kg','ok'],['🧀','Queso cremoso x kg','⚠ 1.2 kg','low']].map(([emoji, name, stock, level]) => (
-                  <div key={String(name)} className="flex items-center gap-3 p-2 rounded-xl bg-slate-800/40">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center text-base flex-shrink-0 bg-slate-700/50">{emoji}</div>
-                    <div className="flex-1 text-slate-300 text-[0.75rem] truncate">{name}</div>
-                    <span className="text-[0.7rem] font-bold flex-shrink-0" style={{ color: level === 'ok' ? '#34d399' : level === 'low' ? '#fbbf24' : '#f87171' }}>{stock}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </Reveal>
-        </div>
-      </section>
-
-      <Divider />
-
-      {/* ── POS ── */}
-      <section id="pos" className="relative z-10 max-w-[1200px] lg:max-w-[1400px] xl:max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 py-16 sm:py-24">
-        <Reveal>
-          <SectionTitle tag="Punto de Venta"
-            title={<>Cobrar nunca fue<br />tan <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">rápido</span></>}
-            desc="Un POS diseñado para la velocidad real de un comercio." />
-        </Reveal>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[['⚡','Escáner instantáneo','Compatible con lectores láser USB y cámara del dispositivo.'],['💵','Efectivo','Cobro en efectivo con cálculo de vuelto automático y cierre de caja.'],['mp-qr','QR Dinámico','QR de Mercado Pago por transacción. Confirmación al instante.'],['mp-static','QR Estático','QR permanente imprimible para tu mostrador.'],['📝','Fiado / Crédito','Vendé a cuenta con límite por cliente y seguimiento de vencimientos.'],['🔄','Múltiples Cajas','Varias terminales desde una sola cuenta con contexto por caja.']].map(([icon, title, desc], i) => (
-            <Reveal key={String(title)} delay={i * 0.04}>
-              <Card className="p-5 sm:p-6 flex flex-col gap-3 h-full">
-                <div className="text-3xl">
-                  {icon === 'mp-qr' || icon === 'mp-static'
-                    ? <img src="/imgs/logo-mercadopago-blanco.png" alt="Mercado Pago" className="h-6 object-contain" />
-                    : icon}
-                </div>
-                <div className="text-base font-bold text-white">{title}</div>
-                <div className="text-[0.82rem] text-slate-400 leading-relaxed">{desc}</div>
-              </Card>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      <Divider />
-
-      {/* ── PLANS ── */}
-      <section id="plans" className="relative z-10 px-4 sm:px-8 lg:px-12 xl:px-16 py-16 sm:py-24" style={{ background: 'linear-gradient(180deg,transparent,rgba(29,78,216,0.05),transparent)' }}>
-        <Reveal>
-          <SectionTitle tag="Planes"
-            title={<>Empezá gratis,<br />crecé sin <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">límites</span></>}
-            desc="Desde el primer mostrador hasta la cadena de locales." />
-        </Reveal>
-        <div className="max-w-[1100px] mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-          {[
-            {
-              name: 'Plan Gratuito',
-              badge: 'Para empezar',
-              accentClass: 'from-emerald-500 to-green-600',
-              featured: false,
-              soon: false,
-              features: ['2 cajas abiertas concurrentes','1 tienda / local','Soporte por email','Gesto IA: Asistente de voz en POS e Inventario','Chat IA: Ventas · Contador · Inventario · General'],
-            },
-            {
-              name: 'Plan Esencial',
-              badge: 'Acceso rápido',
-              accentClass: 'from-sky-500 to-blue-600',
-              featured: false,
-              soon: false,
-              features: ['2 cajas abiertas concurrentes','1 tienda / local','Acceso al panel','Gestión básica del negocio'],
-            },
-            {
-              name: 'Plan Profesional',
-              badge: 'Recomendado',
-              accentClass: 'from-cyan-500 to-teal-600',
-              featured: true,
-              soon: false,
-              features: ['Todo lo del plan anterior','Gesto IA: Asistente de voz en POS e Inventario','Chat IA: Ventas · Contador · Inventario · General','Gestión centralizada','Cobro online seguro'],
-            },
-            {
-              name: 'Plan IA + GPS Integral',
-              badge: 'IA + GPS',
-              accentClass: 'from-indigo-500 to-violet-600',
-              featured: false,
-              soon: true,
-              features: ['Todo lo del plan anterior','Asistente IA de Voz completo','Comercio visible en mapa global','Recomendaciones de precios por email'],
-            },
-          ].map(({ name, badge, accentClass, featured, soon, features }) => (
-            <Reveal key={name}>
-              {soon ? (
-                <motion.div whileHover={{ y: -4 }} className="relative flex flex-col rounded-2xl border border-indigo-500/20 bg-slate-800/40 p-5 sm:p-6 h-full overflow-hidden">
-                  <div className="flex justify-end mb-4">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500 px-3 py-1 text-xs font-bold text-white">
-                      <Sparkles size={11} /> Próximamente
-                    </span>
-                  </div>
-                  <div className="flex-1 flex flex-col items-center justify-center py-4 gap-3">
-                    <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg">
-                      <Sparkles size={28} className="text-white" />
-                    </div>
-                    <p className="text-center text-xl font-black bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent leading-tight">
-                      IA GLOBAL<br />Y MAPA
-                    </p>
-                    <p className="text-center text-xs text-slate-500 max-w-[180px]">Comercio visible en mapa global con recomendaciones de precios y stock por IA.</p>
-                  </div>
-                  <div className={`mt-auto rounded-xl bg-gradient-to-r ${accentClass} px-4 py-3 text-center text-sm font-bold text-white opacity-50`}>
-                    Próximamente disponible
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div whileHover={{ y: -4, boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}
-                  className={`relative flex flex-col rounded-2xl border p-5 sm:p-6 h-full transition-all bg-slate-800/40 ${featured ? 'border-cyan-500/40' : 'border-white/[0.08]'}`}>
-                  {featured && (
-                    <div className="-mx-5 sm:-mx-6 -mt-5 sm:-mt-6 mb-4 flex items-center justify-center gap-1.5 bg-gradient-to-r from-cyan-500 to-teal-600 text-white text-[11px] font-black uppercase tracking-widest py-2 rounded-t-2xl">
-                      <CheckCircle2 size={12} /> {badge}
-                    </div>
-                  )}
-                  {name === 'Plan Gratuito' && (
-                    <div className="-mx-5 sm:-mx-6 -mt-5 sm:-mt-6 mb-4 flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white text-[11px] font-black uppercase tracking-widest py-2 rounded-t-2xl">
-                      <CheckCircle2 size={12} /> Plan inicial 60 días
-                    </div>
-                  )}
-                  {!featured && name !== 'Plan Gratuito' && (
-                    <span className="self-start mb-3 rounded-xl bg-white/[0.07] px-3 py-1.5 text-xs font-semibold text-slate-300">{badge}</span>
-                  )}
-                  <h3 className="text-lg sm:text-xl font-bold text-white mb-3">{name}</h3>
-                  <div className="flex-1 space-y-2 mb-5">
-                    {features.map(f => (
-                      <div key={f} className="flex items-start gap-2 text-[0.78rem] sm:text-sm text-slate-300">
-                        <CheckCircle2 size={15} className="text-emerald-400 flex-shrink-0 mt-0.5" />
-                        <span>{f}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className={`mt-auto rounded-xl bg-gradient-to-r ${accentClass} px-4 py-3 text-center text-sm font-bold text-white`}>
-                    {name === 'Plan Gratuito' ? 'Empezar gratis' : `Elegir ${name}`}
-                  </div>
-                </motion.div>
-              )}
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* ── CTA ── */}
-      <section id="cta" className="relative z-10 px-5 sm:px-8 lg:px-12 xl:px-16 py-20 sm:py-28 text-center">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] pointer-events-none" style={{ background: 'radial-gradient(ellipse,rgba(29,78,216,0.12) 0%,transparent 70%)', filter: 'blur(40px)' }} />
-        <Reveal>
-          <h2 className="font-black leading-tight tracking-tight text-white mb-5" style={{ fontSize: 'clamp(2rem,5vw,3.8rem)' }}>
-            ¿Listo para el<br />
-            <span className="inline-block bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent pr-1">próximo nivel?</span>
-          </h2>
-          <p className="text-slate-400 max-w-md mx-auto leading-relaxed mb-10 text-[0.9rem] sm:text-base">Gesto es la herramienta que tu comercio necesitaba. Empezá gratis hoy y transformá la forma en que trabajás.</p>
-          <div className="flex gap-3 flex-wrap justify-center">
-            <motion.button whileHover={{ scale: 1.03, boxShadow: '0 0 30px rgba(29,78,216,0.5)' }} whileTap={{ scale: 0.97 }}
-              onClick={() => window.open(APP_LOGIN_URL, '_blank')}
-              className="px-7 sm:px-9 py-3 sm:py-3.5 rounded-xl font-bold text-sm sm:text-base text-white cursor-pointer shadow-lg border-none"
-              style={{ background: 'linear-gradient(135deg,#1d4ed8,#0891b2)' }}>
-              Empezar gratis
-            </motion.button>
-            <motion.button whileHover={{ borderColor: 'rgba(96,165,250,0.5)', color: '#93c5fd' }} onClick={() => scrollTo('features')}
-              className="px-7 sm:px-9 py-3 sm:py-3.5 rounded-xl font-semibold text-sm sm:text-base text-slate-400 bg-transparent border border-white/10 cursor-pointer transition-colors">
-              Ver funciones
-            </motion.button>
-          </div>
-        </Reveal>
-      </section>
-
-      <footer className="relative z-10 border-t border-white/10 w-full" style={{ background: 'linear-gradient(to right, rgba(15,23,42,0.95), rgba(30,41,59,0.95))' }}>
-        <div className="mx-auto max-w-7xl px-4 pt-3 pb-2">
-          <div className="grid grid-cols-3 items-center gap-3">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                className="flex items-center gap-3 group bg-transparent border-none cursor-pointer"
-              >
-                <img src="/imgs/Logo-Gesto.png" alt="Logo Gesto" className="h-9 w-9 flex-shrink-0 rounded-full border border-white/20 bg-white/10 object-contain shadow-lg transition-opacity group-hover:opacity-80" />
-                <div className="flex-shrink-0">
-                  <p className="text-sm font-black uppercase tracking-[0.22em] text-white leading-none group-hover:opacity-80 transition-opacity">gesto</p>
-                  <p className="mt-0.5 text-[11px] text-slate-300 leading-none">tu gesto. tu control.</p>
-                </div>
+            <div className="flex items-center gap-2">
+              <button onClick={toggleVoice} aria-pressed={voiceOn} title={voiceOn ? 'Silenciar a Gesto' : 'Escuchar a Gesto'}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-sm font-medium cursor-pointer transition-colors ${voiceOn ? 'border-teal bg-teal-soft text-teal-dark' : 'border-line bg-white text-ink-2 hover:text-ink'}`}>
+                {voiceOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                <span className="hidden lg:inline">{voiceOn ? 'Voz activada' : 'Voz'}</span>
               </button>
-              <div className="ml-2 hidden sm:flex flex-col gap-1 text-[11px] text-slate-300">
-                <a href="https://wa.me/5492622517454" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-slate-100 transition-colors">📞 2622517454</a>
-                <a href="mailto:ortizmichel390@gmail.com" className="text-slate-300 hover:text-slate-100 transition-colors">✉ ortizmichel390@gmail.com</a>
+              <a href={APP_LOGIN_URL} target="_blank" rel="noopener noreferrer" className="hidden sm:inline px-3 py-2 text-sm font-medium text-ink-2 no-underline hover:text-ink">Ingresar</a>
+              <PrimaryButton className="px-4 py-2 text-sm">Probar gratis</PrimaryButton>
+            </div>
+          </nav>
+        </header>
+
+        <main id="top">
+
+          {/* ── HERO ── (anima al cargar, no al hacer scroll) */}
+          <div className="relative">
+          <div aria-hidden="true" className="bg-aurora"><span className="a1" /><span className="a2" /><span className="a3" /></div>
+          <section className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 pt-14 pb-16 sm:pt-20 sm:pb-24 lg:grid-cols-[1.05fr_1fr]">
+            <Reveal group onLoad>
+              <Item>
+                <h1 className="font-display font-extrabold tracking-tight text-ink leading-[1.02] text-[2.6rem] sm:text-6xl">
+                  El mostrador de tu negocio, <span className="text-teal">en orden.</span>
+                </h1>
+              </Item>
+              <Item>
+                <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-2">
+                  Vendé y cobrá con efectivo, QR, transferencia o fiado. Llevá la caja y el stock al día, y mandá lo que te deben por WhatsApp con un clic. Desde la compu o el celular.
+                </p>
+              </Item>
+              <Item className="mt-8 flex flex-wrap items-center gap-3">
+                <PrimaryButton>Probar 60 días gratis <ArrowRight size={18} /></PrimaryButton>
+                <a href={MANUAL_URL} download="gesto-manual-de-uso.pdf" className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-5 py-3 font-semibold text-ink no-underline hover:bg-paper-2">
+                  <Download size={18} /> Manual de uso
+                </a>
+              </Item>
+              <Item><p className="mt-4 text-sm text-ink-3">Sin tarjeta. Apenas entrás, Gesto te guía paso a paso.</p></Item>
+              <Item className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-line pt-5 text-sm text-ink-2">
+                <span className="text-ink-3">Cobrá con</span>
+                <span className="inline-flex items-center gap-1.5 font-medium text-ink"><MpIcon size={22} /> Mercado Pago</span>
+                <span className="inline-flex items-center gap-1.5"><Landmark size={16} className="text-teal" /> Transferencia</span>
+                <span className="inline-flex items-center gap-1.5"><Banknote size={16} className="text-teal" /> Efectivo</span>
+                <span className="inline-flex items-center gap-1.5"><WhatsAppGlyph size={15} className="text-[#25D366]" /> Fiados por WhatsApp</span>
+              </Item>
+              <Item>
+                <button onClick={toggleVoice} className="mt-5 inline-flex items-center gap-2 bg-transparent border-none p-0 text-sm font-medium text-teal cursor-pointer hover:text-teal-dark">
+                  {voiceOn ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                  {voiceOn ? 'Silenciar a Gesto' : 'Escuchar a Gesto mientras recorrés la página'}
+                </button>
+              </Item>
+            </Reveal>
+            <motion.div initial={{ opacity: 0, x: 40, rotate: 1.5 }} animate={{ opacity: 1, x: 0, rotate: 0 }} transition={{ duration: 0.8, delay: 0.25, ease: EASE }}>
+              <PosScreen />
+            </motion.div>
+          </section>
+          </div>
+
+          {/* ── RUBROS ── */}
+          <section className="border-y border-line bg-paper-2/60">
+            <Reveal group className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 sm:px-6 py-5 text-sm">
+              <Item className="font-semibold text-ink">Pensado para</Item>
+              {RUBROS.map(r => <Item key={r} className="text-ink-2">{r}</Item>)}
+            </Reveal>
+          </section>
+
+          {/* ── PRODUCTO ── */}
+          <section id="producto" className="mx-auto max-w-6xl px-4 sm:px-6 py-20 sm:py-28 scroll-mt-16">
+            <Replay id="producto">
+            <Reveal group className="max-w-2xl mb-16">
+              <Item><Eyebrow>Lo que hace Gesto</Eyebrow></Item>
+              <Item><H2>Todo lo del día a día, en una sola pantalla.</H2></Item>
+            </Reveal>
+
+            <div className="space-y-20 sm:space-y-28">
+              <div className="grid items-center gap-10 lg:grid-cols-2">
+                <Reveal group>
+                  <Item><h3 className="font-display text-2xl font-bold mb-3">Cobrá como te paguen</h3></Item>
+                  <Item><p className="text-ink-2 leading-relaxed mb-5">Escaneás, elegís el medio de pago y listo. Si el cliente paga una parte en efectivo y otra por QR, también.</p></Item>
+                  <ul className="m-0 list-none space-y-3 p-0 text-ink">
+                    {([
+                      [<MpIcon key="mp" size={22} />, 'QR de Mercado Pago por venta o fijo en el mostrador, con aviso al instante'],
+                      [<Landmark key="t" size={18} className="text-teal" />, 'Transferencia directa a tu CBU o alias, sin comisión'],
+                      [<Banknote key="e" size={18} className="text-teal" />, 'Efectivo con vuelto calculado'],
+                      [<Split key="s" size={18} className="text-teal" />, 'Pago dividido: una parte en efectivo y el resto por QR'],
+                      [<PauseCircle key="p" size={18} className="text-teal" />, 'Ventas en espera: atendés a otro y volvés sin perder nada'],
+                    ] as [React.ReactNode, string][]).map(([icon, t]) => (
+                      <ItemLi key={t} className="flex items-start gap-3"><span className="flex h-6 w-6 flex-shrink-0 items-center justify-center">{icon}</span>{t}</ItemLi>
+                    ))}
+                  </ul>
+                </Reveal>
+                <Reveal group className="grid grid-cols-2 gap-3 lg:ml-8">
+                  {([
+                    [ScanBarcode, 'Lector USB', 'o la cámara del celular'],
+                    [Scale, 'Por peso', 'verdura, fiambre, carne'],
+                    [MonitorSmartphone, 'Varias cajas', 'cada una en su equipo'],
+                    [NotebookPen, 'Fiado', 'con límite por cliente'],
+                  ] as const).map(([Icon, a, b]) => (
+                    <Item key={a} className="rounded-xl border border-line bg-white p-4 transition-shadow hover:shadow-md">
+                      <Icon size={22} className="mb-3 text-orange" />
+                      <div className="font-semibold text-ink">{a}</div>
+                      <div className="text-sm text-ink-3">{b}</div>
+                    </Item>
+                  ))}
+                </Reveal>
+              </div>
+
+              <div className="grid items-center gap-10 lg:grid-cols-2">
+                <Reveal group className="lg:order-2">
+                  <Item><h3 className="font-display text-2xl font-bold mb-3">La caja cierra, y sabés por qué</h3></Item>
+                  <Item><p className="text-ink-2 leading-relaxed mb-5">Abrís con el monto inicial, cargás ingresos y retiros, y al cerrar contás los billetes con el contador. Gesto te dice cuánto debería haber y cuánto entró por cada medio.</p></Item>
+                  <Item><p className="text-sm text-ink-3">Con el plan Profesional: cierre a ciegas (quien cuenta no ve el total esperado) e historial de cierres en PDF.</p></Item>
+                </Reveal>
+                <Reveal className="lg:order-1 lg:mr-8"><CashScreen /></Reveal>
+              </div>
+
+              <div className="grid items-center gap-10 lg:grid-cols-2">
+                <Reveal group>
+                  <Item><h3 className="font-display text-2xl font-bold mb-3">Stock sin cuaderno</h3></Item>
+                  <Item><p className="text-ink-2 leading-relaxed mb-5">Escaneás un código y, si está entre los más de 37.000 productos que Gesto ya conoce, se completan nombre y marca. Vos ponés precio y cantidad. Se descuenta solo con cada venta, por unidad o por kilo.</p></Item>
+                  <Item><p className="text-ink-2 leading-relaxed">Definís un mínimo por producto y te avisa antes de que se termine.</p></Item>
+                </Reveal>
+                <Reveal className="lg:ml-8"><StockScreen /></Reveal>
               </div>
             </div>
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-[11px] font-semibold text-slate-300 hidden sm:inline">Plataforma de control de caja, inventario y cobros</span>
+            </Replay>
+          </section>
+
+          {/* ── FIADOS ── */}
+          <section id="fiados" className="bg-teal-soft/60 scroll-mt-16">
+            <Replay id="fiados">
+            <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 py-20 sm:py-28 lg:grid-cols-2">
+              <Reveal group>
+                <Item>
+                  <p className="mb-3 inline-flex items-center gap-2 text-sm font-semibold" style={{ color: '#128C7E' }}>
+                    <WhatsAppGlyph size={18} /> Fiados por WhatsApp
+                  </p>
+                </Item>
+                <Item><H2>Lo que te deben, claro y por WhatsApp.</H2></Item>
+                <Item><p className="mt-5 text-lg text-ink-2 leading-relaxed">Cada cliente tiene su cuenta con lo que llevó y lo que pagó. Con un clic, Gesto arma el mensaje con el detalle y el total, y abre WhatsApp listo para mandar.</p></Item>
+                <ul className="m-0 mt-6 list-none space-y-2.5 p-0">
+                  {['Límite de crédito por cliente', 'Aviso de deudas con más de 30 días', 'Cuando paga, queda registrado y le podés confirmar'].map(t => (
+                    <ItemLi key={t} className="flex gap-3"><Check size={18} className="mt-0.5 flex-shrink-0 text-teal" />{t}</ItemLi>
+                  ))}
+                </ul>
+              </Reveal>
+              <Reveal><WhatsAppMessage /></Reveal>
             </div>
-            <div className="flex justify-end">
-              <a href="https://www.clarusrock.com" target="_blank" rel="noopener noreferrer" className="group flex items-center gap-2 transition-opacity hover:opacity-80">
-                <span className="text-[11px] font-semibold text-slate-300 hidden sm:inline">Sitio creado por</span>
-                <img src="/imgs/clarus_rock_logotipo_transparent.svg" alt="Clarus Rock" className="h-11 w-auto object-contain" />
+            </Replay>
+          </section>
+
+          {/* ── EN VIVO + VOZ E IA (bloque oscuro) ── */}
+          <div className="relative bg-ink text-white">
+            <div aria-hidden="true" className="bg-glow"><span className="g1" /><span className="g2" /></div>
+            <div aria-hidden="true" className="bg-dots" />
+
+            <section id="en-vivo" className="relative scroll-mt-16">
+              <Replay id="en-vivo">
+              <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 py-20 sm:py-28 lg:grid-cols-2">
+                <Reveal group>
+                  <Item><p className="mb-3 text-sm font-semibold text-teal-soft/80">En tiempo real</p></Item>
+                  <Item><H2 className="text-white">Varias cajas, una sola cuenta.</H2></Item>
+                  <Item><p className="mt-5 text-lg leading-relaxed text-white/70">Abrí una caja en la compu del mostrador y otra en el celular. Cada venta, cada pago y cada movimiento de stock se ve al instante en todos lados.</p></Item>
+                  <ul className="m-0 mt-6 list-none space-y-3 p-0 text-white/85">
+                    <ItemLi className="flex items-start gap-3"><span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-white"><MpIcon size={18} /></span>Cuando Mercado Pago aprueba un QR, la caja lo marca cobrado sola.</ItemLi>
+                    <ItemLi className="flex items-start gap-3"><MonitorSmartphone size={20} className="mt-0.5 flex-shrink-0 text-teal-soft" />Funciona en el navegador: no hay que instalar nada.</ItemLi>
+                    <ItemLi className="flex items-start gap-3"><Bell size={20} className="mt-0.5 flex-shrink-0 text-orange" />Avisos de stock bajo y de fiados atrasados en el inicio.</ItemLi>
+                  </ul>
+                </Reveal>
+                <Reveal group className="space-y-4">
+                  <Item><DevicesView /></Item>
+                  <Item><LiveFeed /></Item>
+                </Reveal>
+              </div>
+              </Replay>
+            </section>
+
+            <div className="relative mx-auto max-w-6xl px-4 sm:px-6"><div className="h-px bg-white/10" /></div>
+
+            <section id="voz" className="relative scroll-mt-16">
+              <Replay id="voz">
+              <div className="mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 py-20 sm:py-28 lg:grid-cols-2">
+                <Reveal group>
+                  <Item><p className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-orange"><Mic size={16} /> Comandos de voz</p></Item>
+                  <Item><H2 className="mb-5 text-white">Con las manos ocupadas, hablale.</H2></Item>
+                  <Item><p className="mb-6 leading-relaxed text-white/70">Decís "Gesto" y le pedís lo que necesitás: agregar al carrito, cobrar, fiar, cargar un producto o consultar un precio.</p></Item>
+                  <Item><VoiceConsole /></Item>
+                </Reveal>
+                <Reveal group>
+                  <Item><p className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-teal-soft/80"><Sparkles size={16} /> Chat con IA</p></Item>
+                  <Item><H2 className="mb-5 text-white">Preguntale a tu negocio.</H2></Item>
+                  <Item><p className="mb-6 leading-relaxed text-white/70">Responde con tus números reales: qué se vende más, qué no sale, cuánto entró por cada medio y quién te debe.</p></Item>
+                  {/* Las burbujas del chat entran de a una, como una conversación */}
+                  <motion.div variants={{ hidden: {}, show: { transition: { staggerChildren: 0.45, delayChildren: 0.4 } } }}
+                    className="space-y-3 rounded-xl border border-white/10 bg-white/[0.04] p-5 text-sm">
+                    <Item className="ml-auto w-fit max-w-[85%] rounded-lg bg-teal px-3 py-2 text-white">¿Cuánto me deben en fiados y quién hace más que no paga?</Item>
+                    <Item className="max-w-[92%] rounded-lg bg-white/[0.06] px-3 py-2.5 leading-relaxed text-white/80">
+                      Tenés <strong className="text-white">$ 48.200</strong> en fiados. De eso, <strong className="text-orange">$ 12.800</strong> tiene más de 30 días y es de 3 clientes; el más atrasado es Carlos R. (42 días). Este mes ya recuperaste <strong className="text-emerald-300">$ 31.500</strong>.
+                    </Item>
+                    <Item className="ml-auto w-fit max-w-[85%] rounded-lg bg-teal px-3 py-2 text-white">¿Qué productos no se están vendiendo?</Item>
+                    <Item className="max-w-[92%] rounded-lg bg-white/[0.06] px-3 py-2.5 leading-relaxed text-white/80">
+                      En los últimos 30 días no salieron 9 productos. Los que más plata tienen parada: aceite de oliva 500 ml (12 u) y café molido 250 g (8 u).
+                    </Item>
+                  </motion.div>
+                  <Item><p className="mt-4 text-sm text-white/50">Voz y chat con IA incluidos en la prueba gratis y en el plan Profesional.</p></Item>
+                </Reveal>
+              </div>
+              </Replay>
+            </section>
+          </div>
+
+          {/* ── PRIMEROS PASOS ── */}
+          <section id="primeros-pasos" className="border-t border-line bg-paper-2/60 scroll-mt-16">
+            <Replay id="primeros-pasos">
+            <div className="mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 py-20 sm:py-28 lg:grid-cols-[1fr_1.3fr]">
+              <Reveal group>
+                <Item><Eyebrow>Primeros pasos</Eyebrow></Item>
+                <Item><H2>No arrancás solo.</H2></Item>
+                <Item><p className="mt-5 text-ink-2 leading-relaxed">Apenas entrás, Gesto te lleva a cada pantalla y te marca qué tocar. Si querés, te lo explica en voz alta. Tu avance queda guardado: si cortás, seguís donde quedaste.</p></Item>
+                <Item>
+                  <a href={MANUAL_URL} download="gesto-manual-de-uso.pdf" className="mt-6 inline-flex items-center gap-2 font-semibold text-teal no-underline hover:text-teal-dark">
+                    <Download size={18} /> Descargar el manual de uso (PDF)
+                  </a>
+                </Item>
+              </Reveal>
+              <Reveal group>
+                <ol className="list-none m-0 p-0">
+                  {GUIDE_STEPS.map(([title, desc], i) => (
+                    <ItemLi key={title} className="flex gap-5 border-b border-line py-5 last:border-b-0">
+                      <span className="font-display text-2xl font-bold text-orange tabular-nums w-6 flex-shrink-0">{i + 1}</span>
+                      <div>
+                        <div className="font-semibold text-ink">{title}</div>
+                        <div className="text-ink-2 text-[0.95rem] leading-relaxed">{desc}</div>
+                      </div>
+                    </ItemLi>
+                  ))}
+                </ol>
+              </Reveal>
+            </div>
+            </Replay>
+          </section>
+
+          {/* ── PLANES ── */}
+          <section id="planes" className="mx-auto max-w-6xl px-4 sm:px-6 py-20 sm:py-28 scroll-mt-16">
+            <Replay id="planes">
+            <Reveal group className="max-w-2xl mb-12">
+              <Item><Eyebrow>Planes</Eyebrow></Item>
+              <Item><H2>Probalo 60 días. Después, pagás mes a mes.</H2></Item>
+              <Item><p className="mt-4 text-ink-2">Sin contrato ni permanencia. Pagás con Mercado Pago y cambiás de plan cuando quieras.</p></Item>
+            </Reveal>
+            <Reveal group className="grid gap-5 md:grid-cols-3">
+              {PLANS.map(plan => (
+                <Item key={plan.name} className="h-full">
+                  <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}
+                    className={`flex h-full flex-col rounded-xl border bg-white p-6 transition-shadow hover:shadow-lg ${plan.featured ? 'border-teal ring-1 ring-teal' : 'border-line'}`}>
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-display text-xl font-bold">{plan.name}</h3>
+                      {plan.featured && <span className="rounded-full bg-teal-soft px-2.5 py-0.5 text-xs font-semibold text-teal-dark">Recomendado</span>}
+                    </div>
+                    <p className="mt-1 text-sm text-ink-3">{plan.note}</p>
+                    <p className="mt-5 flex items-baseline gap-2">
+                      <span className="font-display text-3xl font-bold tabular-nums">{typeof plan.price === 'number' ? priceFormatter.format(plan.price) : plan.price}</span>
+                      <span className="text-sm text-ink-3">{plan.period}</span>
+                    </p>
+                    <ul className="mt-5 flex-1 space-y-2.5 text-[0.95rem]">
+                      {plan.features.map(f => (
+                        <li key={f} className="flex gap-2.5"><Check size={17} className="mt-0.5 flex-shrink-0 text-teal" />{f}</li>
+                      ))}
+                    </ul>
+                    <a href={APP_LOGIN_URL} target="_blank" rel="noopener noreferrer"
+                      className={`mt-6 rounded-lg px-4 py-2.5 text-center font-semibold no-underline transition-colors ${plan.featured ? 'bg-teal text-white hover:bg-teal-dark' : 'border border-line text-ink hover:bg-paper-2'}`}>
+                      {plan.cta}
+                    </a>
+                  </motion.div>
+                </Item>
+              ))}
+            </Reveal>
+            <Reveal>
+              <p className="mt-6 text-sm text-ink-3">
+                Próximamente: <strong className="font-semibold text-ink-2">IA + GPS Integral</strong> ({priceFormatter.format(50000)}/mes) con hasta 5 cajas, tu comercio en el mapa y recomendaciones de precios por email.
+              </p>
+            </Reveal>
+            </Replay>
+          </section>
+
+          {/* ── PREGUNTAS ── */}
+          <section id="preguntas" className="border-t border-line scroll-mt-16">
+            <Replay id="preguntas">
+            <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 py-20 sm:py-28 lg:grid-cols-[1fr_1.6fr]">
+              <Reveal group>
+                <Item><H2>Preguntas frecuentes</H2></Item>
+                <Item><p className="mt-4 text-ink-2">¿Te quedó alguna duda? Escribinos por WhatsApp y te respondemos nosotros, no un bot.</p></Item>
+                <Item>
+                  <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex items-center gap-2 font-semibold text-teal no-underline hover:text-teal-dark">
+                    <WhatsAppGlyph size={18} /> 2622 51-7454
+                  </a>
+                </Item>
+              </Reveal>
+              <Reveal group className="divide-y divide-line border-y border-line">
+                {FAQ.map(([q, a], i) => {
+                  const open = openFaq === i;
+                  return (
+                    <Item key={q}>
+                      <button onClick={() => setOpenFaq(open ? null : i)} aria-expanded={open}
+                        className="flex w-full items-center justify-between gap-4 bg-transparent border-none py-4 text-left font-semibold text-ink cursor-pointer">
+                        {q}
+                        <ChevronDown size={18} className={`flex-shrink-0 text-ink-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+                      </button>
+                      <AnimatePresence initial={false}>
+                        {open && (
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: EASE }} className="overflow-hidden">
+                            <p className="m-0 pb-5 pr-8 text-ink-2 leading-relaxed">{a}</p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </Item>
+                  );
+                })}
+              </Reveal>
+            </div>
+            </Replay>
+          </section>
+
+          {/* ── CTA FINAL ── */}
+          <section className="bg-ink text-white">
+            <Reveal group className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 sm:px-6 py-16 sm:py-20 md:flex-row md:items-center md:justify-between">
+              <Item>
+                <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight">Probalo en tu mostrador.</h2>
+                <p className="mt-2 text-white/70">60 días gratis, sin tarjeta. Si no te sirve, no pagás nada.</p>
+              </Item>
+              <Item>
+                <a href={APP_LOGIN_URL} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-lg bg-orange px-6 py-3 font-semibold text-ink no-underline hover:brightness-105">
+                  Crear mi cuenta <ArrowRight size={18} />
+                </a>
+              </Item>
+            </Reveal>
+          </section>
+        </main>
+
+        <footer className="border-t border-line">
+          <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:px-6 py-8 text-sm text-ink-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-2">
+              <img src="/imgs/Logo-Gesto.png" alt="" className="h-6 w-6 object-contain" />
+              <span className="font-display font-bold text-ink">Gesto</span>
+              <span>· © {new Date().getFullYear()}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-ink-2 no-underline hover:text-ink"><WhatsAppGlyph size={14} /> 2622 51-7454</a>
+              <a href="mailto:ortizmichel390@gmail.com" className="text-ink-2 no-underline hover:text-ink">ortizmichel390@gmail.com</a>
+              <a href="https://www.clarusrock.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-ink-3 no-underline hover:text-ink-2">
+                Sitio por <img src="/imgs/clarus_rock_logotipo_black_version.svg" alt="Clarus Rock" className="h-6 w-auto" />
               </a>
             </div>
           </div>
-          <div className="mt-2 flex items-center justify-center border-t border-white/10 pt-2">
-            <p className="text-[10px] text-slate-500">© {new Date().getFullYear()} Gesto · Todos los derechos reservados</p>
-          </div>
-        </div>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </MotionConfig>
+    </ReplayContext.Provider>
   );
 }

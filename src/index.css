@@ -1,15 +1,88 @@
 @import "tailwindcss";
 
-@keyframes shimmer {
-  0% { background-position: -200% center; }
-  100% { background-position: 200% center; }
+/* Colores de marca tomados del logo: verde azulado + naranja, sobre fondo claro cálido */
+@theme {
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-sans: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-paper: #faf7f2;
+  --color-paper-2: #f2ede4;
+  --color-ink: #1c2628;
+  --color-ink-2: #4a5759;
+  --color-ink-3: #7b8789;
+  --color-line: #e3ddd2;
+
+  --color-teal: #137a8c;
+  --color-teal-dark: #0d5e6c;
+  --color-teal-soft: #e1f0f1;
+  --color-orange: #e8781e;
+  --color-orange-soft: #fcebdc;
 }
 
-.text-shimmer {
-  background: linear-gradient(90deg, #60a5fa, #22d3ee, #34d399, #60a5fa);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: shimmer 3s linear infinite;
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Fondos en movimiento ──
+   Solo transform / background-position (los anima la GPU), detrás del contenido y sin ocupar lugar. */
+
+/* Hero: manchas de luz con los colores de marca */
+.bg-aurora { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.bg-aurora span {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  will-change: transform;
+}
+.bg-aurora .a1 {
+  width: 520px; height: 520px; top: -160px; right: -80px;
+  background: rgba(19, 122, 140, 0.32);
+  animation: drift-1 11s ease-in-out infinite alternate;
+}
+.bg-aurora .a2 {
+  width: 420px; height: 420px; bottom: -140px; right: 22%;
+  background: rgba(232, 120, 30, 0.30);
+  animation: drift-2 13s ease-in-out infinite alternate;
+}
+.bg-aurora .a3 {
+  width: 360px; height: 360px; top: 30%; left: -140px;
+  background: rgba(19, 122, 140, 0.22);
+  animation: drift-3 15s ease-in-out infinite alternate;
+}
+@keyframes drift-1 { to { transform: translate(-320px, 220px) scale(1.25); } }
+@keyframes drift-2 { to { transform: translate(340px, -200px) scale(0.85); } }
+@keyframes drift-3 { to { transform: translate(300px, -140px) scale(1.2); } }
+
+/* Bloque oscuro: grilla de puntos que se desliza + brillo que la recorre */
+.bg-dots {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(circle, rgba(225, 240, 241, 0.14) 1px, transparent 1px);
+  background-size: 22px 22px;
+  animation: dots-move 6s linear infinite;
+}
+@keyframes dots-move { to { background-position: 22px 22px; } }
+
+.bg-glow { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.bg-glow span {
+  position: absolute; width: 640px; height: 640px; border-radius: 9999px;
+  background: radial-gradient(circle, rgba(19, 122, 140, 0.45) 0%, transparent 65%);
+  will-change: transform;
+}
+.bg-glow .g1 { top: -200px; left: -200px; animation: glow-1 14s ease-in-out infinite alternate; }
+.bg-glow .g2 {
+  bottom: -260px; right: -220px;
+  background: radial-gradient(circle, rgba(232, 120, 30, 0.24) 0%, transparent 65%);
+  animation: glow-2 17s ease-in-out infinite alternate;
+}
+@keyframes glow-1 { to { transform: translate(60vw, 40vh); } }
+@keyframes glow-2 { to { transform: translate(-50vw, -50vh); } }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .bg-aurora span, .bg-dots, .bg-glow span { animation: none; }
 }
