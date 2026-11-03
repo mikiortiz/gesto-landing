@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+/* Fuentes propias (variables, subset latin: cubre á é í ó ú ñ ¿ ¡). Antes venían de Google Fonts y bloqueaban el render. */
+@font-face {
+  font-family: "Bricolage Grotesque";
+  font-style: normal;
+  font-weight: 600 800;
+  font-display: swap;
+  src: url("/fonts/bricolage-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Figtree";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/figtree-latin.woff2") format("woff2");
+}
+
 /* Colores de marca tomados del logo: verde azulado + naranja, sobre fondo claro cálido */
 @theme {
   --font-display: "Bricolage Grotesque", system-ui, sans-serif;
@@ -9,7 +25,7 @@
   --color-paper-2: #f2ede4;
   --color-ink: #1c2628;
   --color-ink-2: #4a5759;
-  --color-ink-3: #7b8789;
+  --color-ink-3: #626e70; /* AA (≥4.5:1) sobre paper y paper-2 */
   --color-line: #e3ddd2;
 
   --color-teal: #137a8c;
@@ -59,13 +75,16 @@ body {
 @keyframes drift-3 { to { transform: translate(300px, -140px) scale(1.2); } }
 
 /* Bloque oscuro: grilla de puntos que se desliza + brillo que la recorre */
-.bg-dots {
-  position: absolute; inset: 0; pointer-events: none;
+/* Se mueve con transform (compuesto en GPU) en lugar de background-position, que repinta cada frame */
+.bg-dots { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.bg-dots::before {
+  content: ""; position: absolute; inset: -22px 0 0 -22px;
   background-image: radial-gradient(circle, rgba(225, 240, 241, 0.14) 1px, transparent 1px);
   background-size: 22px 22px;
+  will-change: transform;
   animation: dots-move 6s linear infinite;
 }
-@keyframes dots-move { to { background-position: 22px 22px; } }
+@keyframes dots-move { to { transform: translate(22px, 22px); } }
 
 .bg-glow { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .bg-glow span {
@@ -84,5 +103,5 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .bg-aurora span, .bg-dots, .bg-glow span { animation: none; }
+  .bg-aurora span, .bg-dots::before, .bg-glow span { animation: none; }
 }

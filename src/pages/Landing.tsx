@@ -159,7 +159,7 @@ function Screen({ title, children, className = '' }: { title: string; children: 
   return (
     <div className={`rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(28,38,40,0.04),0_12px_32px_-12px_rgba(28,38,40,0.18)] overflow-hidden ${className}`}>
       <div className="flex items-center gap-2 border-b border-line bg-paper px-4 py-2.5">
-        <img src="/imgs/Logo-Gesto.png" alt="" className="h-5 w-5 object-contain" />
+        <img src="/imgs/logo-gesto-96.webp" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
         <span className="text-xs font-semibold text-ink-2">{title}</span>
       </div>
       {children}
@@ -495,7 +495,7 @@ export function Landing() {
                 </button>
               )}
               <a href="#top" className="flex items-center gap-2 no-underline">
-                <motion.img src="/imgs/Logo-Gesto.png" alt="" className="h-8 w-8 object-contain"
+                <motion.img src="/imgs/logo-gesto-96.webp" alt="" width={32} height={32} className="h-8 w-8 object-contain"
                   initial={{ opacity: 0, scale: 0.6, rotate: -20 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} transition={{ duration: 0.6, ease: EASE }} />
                 <motion.span initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.15, ease: EASE }}
                   className="font-display text-xl font-bold text-ink">Gesto</motion.span>
@@ -848,7 +848,7 @@ export function Landing() {
         <footer className="border-t border-line">
           <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:px-6 py-8 text-sm text-ink-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-2">
-              <img src="/imgs/Logo-Gesto.png" alt="" className="h-6 w-6 object-contain" />
+              <img src="/imgs/logo-gesto-96.webp" alt="" width={24} height={24} loading="lazy" className="h-6 w-6 object-contain" />
               <span className="font-display font-bold text-ink">Gesto</span>
               <span>· © {new Date().getFullYear()}</span>
             </div>
@@ -856,7 +856,7 @@ export function Landing() {
               <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-ink-2 no-underline hover:text-ink"><WhatsAppGlyph size={14} /> 2622 51-7454</a>
               <a href="mailto:ortizmichel390@gmail.com" className="text-ink-2 no-underline hover:text-ink">ortizmichel390@gmail.com</a>
               <a href="https://www.clarusrock.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-ink-3 no-underline hover:text-ink-2">
-                Sitio por <img src="/imgs/clarus_rock_logotipo_black_version.svg" alt="Clarus Rock" className="h-6 w-auto" />
+                Sitio por <img src="/imgs/clarus_rock_logotipo_black_version.svg" alt="Clarus Rock" width={71} height={24} loading="lazy" className="h-6 w-auto" />
               </a>
             </div>
           </div>

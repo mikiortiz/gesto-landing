@@ -1,0 +1,24 @@
+# Gesto
+
+> Gesto (gesto.lat) es un sistema de punto de venta para comercios de mostrador en Argentina: almacenes, verdulerías, carnicerías, panaderías, kioscos, dietéticas y fiambrerías. Funciona en el navegador de la compu, la tablet o el celular. Se puede probar 60 días gratis, sin tarjeta.
+
+## Qué hace
+
+- Ventas y cobros: efectivo con vuelto calculado, QR de Mercado Pago (por venta o fijo), transferencia directa al CBU o alias del comercio sin comisión, fiado y pago dividido.
+- Caja: apertura con monto inicial, ingresos y retiros, cierre con contador de billetes; varias cajas abiertas a la vez en distintos dispositivos.
+- Stock: carga escaneando el código de barras (lector USB o cámara del celular), con una base de más de 37.000 productos que completa nombre y marca. Venta por peso.
+- Fiados: límite por cliente y envío por WhatsApp de lo que cada cliente debe.
+- Asistente de voz y chat con IA para operar la caja y consultar ventas, stock y fiados.
+
+## Planes
+
+- Prueba gratis: 60 días, todas las funciones, 3 cajas abiertas, 1 local.
+- Esencial: $20.000 ARS por mes, 2 cajas abiertas, hasta 2 locales.
+- Profesional: $35.000 ARS por mes, 3 cajas abiertas, hasta 3 locales, asistente de voz e IA, cierre a ciegas e historial de cierres en PDF.
+
+## Enlaces
+
+- [Sitio principal](https://www.gesto.lat/): presentación del producto, planes y preguntas frecuentes
+- [Manual de uso (PDF)](https://www.gesto.lat/docs/gesto-manual-de-uso.pdf): guía paso a paso del sistema
+- [Ingresar o crear cuenta](https://app.gesto.lat/admin-login): acceso a la aplicación
+- [Contacto por WhatsApp](https://wa.me/5492622517454)
