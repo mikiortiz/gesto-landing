@@ -541,9 +541,9 @@ export function Landing() {
                   <Download size={18} /> Manual de uso
                 </a>
               </Item>
-              <Item><p className="mt-4 text-sm text-ink-3">Sin tarjeta. Apenas entrás, Gesto te guía paso a paso.</p></Item>
+              <Item><p className="mt-4 text-sm text-ink-2">Sin tarjeta. Apenas entrás, Gesto te guía paso a paso.</p></Item>
               <Item className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-line pt-5 text-sm text-ink-2">
-                <span className="text-ink-3">Cobrá con</span>
+                <span className="text-ink-2">Cobrá con</span>
                 <span className="inline-flex items-center gap-1.5 font-medium text-ink"><MpIcon size={22} /> Mercado Pago</span>
                 <span className="inline-flex items-center gap-1.5"><Landmark size={16} className="text-teal" /> Transferencia</span>
                 <span className="inline-flex items-center gap-1.5"><Banknote size={16} className="text-teal" /> Efectivo</span>
