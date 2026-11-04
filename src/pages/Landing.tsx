@@ -906,7 +906,8 @@ export function Landing() {
               Una solución de <img src="/imgs/clarus_rock_logotipo_black_version.svg" alt="ClarusRock" width={106} height={36} loading="lazy" className="h-9 w-auto" />
             </a>
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-ink-2 no-underline hover:text-ink"><WhatsAppGlyph size={14} /> 2622 51-7454</a>
+              <span className="w-full text-center text-xs font-semibold uppercase tracking-wider text-ink-3 sm:w-auto">Soporte</span>
+              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-ink-2 no-underline hover:text-ink"><WhatsAppGlyph size={16} className="text-[#25D366]" /> 2622 51-7454</a>
               <a href={`mailto:${CONTACT_EMAIL}`} className="text-ink-2 no-underline hover:text-ink">{CONTACT_EMAIL}</a>
             </div>
           </div>
