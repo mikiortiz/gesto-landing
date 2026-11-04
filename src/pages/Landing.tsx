@@ -1,9 +1,9 @@
-import { createContext, Fragment, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, Fragment, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, MotionConfig, AnimatePresence, type Variants } from 'framer-motion';
 import {
   Check, ChevronDown, Download, Volume2, VolumeX, ArrowRight, ScanBarcode, Mic, Banknote, Landmark,
-  NotebookPen, Scale, MonitorSmartphone, Split, PauseCircle, Laptop, Smartphone, Sparkles, Bell,
+  NotebookPen, Scale, MonitorSmartphone, Split, PauseCircle, Laptop, Smartphone, Sparkles, Bell, Mail, X,
 } from 'lucide-react';
 import { speak } from '../services/speechService';
 
@@ -11,6 +11,9 @@ const APP_LOGIN_URL = 'https://app.gesto.lat/admin-login';
 // Manual de uso servido por la propia landing (public/docs), así el link no depende del deploy de la app
 const MANUAL_URL = '/docs/gesto-manual-de-uso.pdf';
 const WHATSAPP_URL = 'https://wa.me/5492622517454';
+const CONTACT_EMAIL = 'michel@clarusrock.com';
+// La prueba y los planes se piden por contacto (no hay alta abierta): cada botón abre una ventanita para elegir WhatsApp o email
+const TRIAL_MESSAGE = 'Hola! Quiero probar Gesto 60 días gratis en mi comercio.';
 const MP_ICON = '/imgs/logos-MP/mercadopago.svg';
 const WA_GREEN = '#25D366';
 
@@ -44,7 +47,7 @@ const PLANS = [
     period: '60 días',
     note: 'Todo incluido para que lo pruebes en serio.',
     features: ['3 cajas abiertas a la vez', '1 local', 'Asistente de voz y chat con IA', 'Soporte por email'],
-    cta: 'Empezar la prueba',
+    cta: 'Pedir la prueba',
     featured: false,
   },
   {
@@ -68,7 +71,7 @@ const PLANS = [
 ];
 
 const FAQ: [string, string][] = [
-  ['¿Necesito tarjeta para probarlo?', 'No. Te registrás y tenés 60 días con todas las funciones. Si después querés seguir, elegís un plan y lo pagás con Mercado Pago, mes a mes.'],
+  ['¿Necesito tarjeta para probarlo?', 'No. Nos escribís por WhatsApp o email, te damos de alta y tenés 60 días con todas las funciones. Si después querés seguir, elegís un plan y lo pagás con Mercado Pago, mes a mes.'],
   ['¿Qué pasa cuando terminan los 60 días?', 'Podés seguir entrando y ver todo lo que cargaste, pero para vender y abrir caja hay que activar un plan. No se borra nada.'],
   ['¿Funciona en el celular?', 'Sí. Gesto funciona en el navegador de la compu, la tablet o el celular, y podés tener varias cajas abiertas en distintos dispositivos.'],
   ['¿Qué lector de códigos necesito?', 'Cualquier lector USB común. Si no tenés, podés escanear con la cámara del celular o buscar el producto por nombre.'],
@@ -130,12 +133,55 @@ function H2({ children, className = '' }: { children: React.ReactNode; className
   return <h2 className={`font-display font-bold tracking-tight text-ink text-3xl sm:text-4xl leading-[1.1] ${className}`}>{children}</h2>;
 }
 
+// Abre la ventanita de contacto con el mensaje que se va a precargar
+const ContactContext = createContext<(message: string) => void>(() => {});
+
 function PrimaryButton({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  const openContact = useContext(ContactContext);
   return (
-    <a href={APP_LOGIN_URL} target="_blank" rel="noopener noreferrer"
-      className={`inline-flex items-center justify-center gap-2 rounded-lg bg-teal px-5 py-3 font-semibold text-white no-underline transition-colors hover:bg-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal ${className}`}>
+    <button type="button" onClick={() => openContact(TRIAL_MESSAGE)}
+      className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border-0 bg-teal px-5 py-3 font-sans text-base font-semibold text-white transition-colors hover:bg-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal ${className}`}>
       {children}
-    </a>
+    </button>
+  );
+}
+
+function ContactDialog({ message, onClose }: { message: string; onClose: () => void }) {
+  const firstRef = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    firstRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const text = encodeURIComponent(message);
+  const option = 'flex items-center gap-4 rounded-xl border border-line bg-white p-4 text-ink no-underline transition-colors hover:border-teal hover:bg-teal-soft focus-visible:outline-2 focus-visible:outline-teal';
+  return (
+    <motion.div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/50 p-4 sm:items-center"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+      <motion.div role="dialog" aria-modal="true" aria-labelledby="contact-title"
+        className="relative w-full max-w-md rounded-2xl bg-paper p-6 shadow-2xl"
+        initial={{ opacity: 0, y: 24, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.98 }}
+        transition={{ duration: 0.3, ease: EASE }} onClick={e => e.stopPropagation()}>
+        <button type="button" onClick={onClose} aria-label="Cerrar"
+          className="absolute right-3 top-3 cursor-pointer rounded-lg border-0 bg-transparent p-2 text-ink-3 hover:bg-paper-2 hover:text-ink">
+          <X size={18} />
+        </button>
+        <h2 id="contact-title" className="pr-8 font-display text-2xl font-bold tracking-tight">¿Cómo preferís escribirnos?</h2>
+        <p className="mt-1.5 text-sm text-ink-2">Te damos de alta y te ayudamos a arrancar. Te contestamos nosotros, no un bot.</p>
+        <div className="mt-5 grid gap-3">
+          <a ref={firstRef} href={`${WHATSAPP_URL}?text=${text}`} target="_blank" rel="noopener noreferrer" onClick={onClose} className={option}>
+            <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-white" style={{ background: WA_GREEN }}><WhatsAppGlyph size={22} /></span>
+            <span><strong className="block font-semibold">WhatsApp</strong><span className="text-sm text-ink-3">2622 51-7454 · el mensaje ya va escrito</span></span>
+          </a>
+          <a href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Quiero probar Gesto')}&body=${text}`} onClick={onClose} className={option}>
+            <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-teal text-white"><Mail size={20} /></span>
+            <span className="min-w-0"><strong className="block font-semibold">Email</strong><span className="block truncate text-sm text-ink-3">{CONTACT_EMAIL}</span></span>
+          </a>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -440,6 +486,8 @@ export function Landing() {
   const [voiceOn, setVoiceOn] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const spokenRef = useRef(new Set<string>());
+  const [contactMessage, setContactMessage] = useState<string | null>(null);
+  const closeContact = useCallback(() => setContactMessage(null), []);
 
   // La voz solo suena si la persona la activa: presentación + una narración por sección al llegar a ella
   const toggleVoice = () => {
@@ -480,6 +528,7 @@ export function Landing() {
   };
 
   return (
+    <ContactContext.Provider value={setContactMessage}>
     <ReplayContext.Provider value={replay}>
     <MotionConfig reducedMotion="user">
       {/* overflow-x-clip (no hidden): hidden rompe el position: sticky del navbar */}
@@ -541,7 +590,7 @@ export function Landing() {
                   <Download size={18} /> Manual de uso
                 </a>
               </Item>
-              <Item><p className="mt-4 text-sm text-ink-2">Sin tarjeta. Apenas entrás, Gesto te guía paso a paso.</p></Item>
+              <Item><p className="mt-4 text-sm text-ink-2">Sin tarjeta. Nos escribís, te damos de alta y te acompañamos paso a paso.</p></Item>
               <Item className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-line pt-5 text-sm text-ink-2">
                 <span className="text-ink-2">Cobrá con</span>
                 <span className="inline-flex items-center gap-1.5 font-medium text-ink"><MpIcon size={22} /> Mercado Pago</span>
@@ -773,10 +822,10 @@ export function Landing() {
                         <li key={f} className="flex gap-2.5"><Check size={17} className="mt-0.5 flex-shrink-0 text-teal" />{f}</li>
                       ))}
                     </ul>
-                    <a href={APP_LOGIN_URL} target="_blank" rel="noopener noreferrer"
-                      className={`mt-6 rounded-lg px-4 py-2.5 text-center font-semibold no-underline transition-colors ${plan.featured ? 'bg-teal text-white hover:bg-teal-dark' : 'border border-line text-ink hover:bg-paper-2'}`}>
+                    <button type="button" onClick={() => setContactMessage(plan.price === 'Gratis' ? TRIAL_MESSAGE : `Hola! Quiero el plan ${plan.name} de Gesto.`)}
+                      className={`mt-6 cursor-pointer rounded-lg px-4 py-2.5 text-center font-sans text-base font-semibold transition-colors ${plan.featured ? 'border-0 bg-teal text-white hover:bg-teal-dark' : 'border border-line bg-transparent text-ink hover:bg-paper-2'}`}>
                       {plan.cta}
-                    </a>
+                    </button>
                   </motion.div>
                 </Item>
               ))}
@@ -836,10 +885,10 @@ export function Landing() {
                 <p className="mt-2 text-white/70">60 días gratis, sin tarjeta. Si no te sirve, no pagás nada.</p>
               </Item>
               <Item>
-                <a href={APP_LOGIN_URL} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg bg-orange px-6 py-3 font-semibold text-ink no-underline hover:brightness-105">
-                  Crear mi cuenta <ArrowRight size={18} />
-                </a>
+                <button type="button" onClick={() => setContactMessage(TRIAL_MESSAGE)}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border-0 bg-orange px-6 py-3 font-sans text-base font-semibold text-ink hover:brightness-105">
+                  Pedir mi prueba gratis <ArrowRight size={18} />
+                </button>
               </Item>
             </Reveal>
           </section>
@@ -854,7 +903,7 @@ export function Landing() {
             </div>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
               <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-ink-2 no-underline hover:text-ink"><WhatsAppGlyph size={14} /> 2622 51-7454</a>
-              <a href="mailto:ortizmichel390@gmail.com" className="text-ink-2 no-underline hover:text-ink">ortizmichel390@gmail.com</a>
+              <a href={`mailto:${CONTACT_EMAIL}`} className="text-ink-2 no-underline hover:text-ink">{CONTACT_EMAIL}</a>
               <a href="https://www.clarusrock.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-ink-3 no-underline hover:text-ink-2">
                 Sitio por <img src="/imgs/clarus_rock_logotipo_black_version.svg" alt="Clarus Rock" width={71} height={24} loading="lazy" className="h-6 w-auto" />
               </a>
@@ -862,7 +911,11 @@ export function Landing() {
           </div>
         </footer>
       </div>
+      <AnimatePresence>
+        {contactMessage && <ContactDialog message={contactMessage} onClose={closeContact} />}
+      </AnimatePresence>
     </MotionConfig>
     </ReplayContext.Provider>
+    </ContactContext.Provider>
   );
 }

@@ -263,7 +263,7 @@ Reemplazar el `<Footer />` al final del return por este footer inline:
         </button>
         <div className="ml-2 hidden sm:flex flex-col gap-1 text-[11px] text-slate-300">
           <a href="https://wa.me/5492622517454" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-slate-100 transition-colors">📞 2622517454</a>
-          <a href="mailto:ortizmichel390@gmail.com" className="text-slate-300 hover:text-slate-100 transition-colors">✉ ortizmichel390@gmail.com</a>
+          <a href="mailto:michel@clarusrock.com" className="text-slate-300 hover:text-slate-100 transition-colors">✉ michel@clarusrock.com</a>
         </div>
       </div>
       <div className="flex flex-col items-center gap-1">
