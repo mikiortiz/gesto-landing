@@ -895,18 +895,19 @@ export function Landing() {
         </main>
 
         <footer className="border-t border-line">
-          <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:px-6 py-8 text-sm text-ink-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-2">
-              <img src="/imgs/logo-gesto-96.webp" alt="" width={24} height={24} loading="lazy" className="h-6 w-6 object-contain" />
-              <span className="font-display font-bold text-ink">Gesto</span>
+          {/* Mismo tamaño de logo ClarusRock que el pie de eternia.lat (106×36); en el celular va todo centrado */}
+          <div className="mx-auto flex max-w-6xl flex-col items-center gap-5 px-4 sm:px-6 py-10 text-sm text-ink-3 lg:flex-row lg:justify-between">
+            <div className="flex items-center gap-2.5">
+              <img src="/imgs/logo-gesto-96.webp" alt="" width={36} height={36} loading="lazy" className="h-9 w-9 object-contain" />
+              <span className="font-display text-lg font-bold text-ink">Gesto</span>
               <span>· © {new Date().getFullYear()}</span>
             </div>
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <a href="https://www.clarusrock.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2.5 text-ink-2 no-underline hover:text-ink">
+              Una solución de <img src="/imgs/clarus_rock_logotipo_black_version.svg" alt="ClarusRock" width={106} height={36} loading="lazy" className="h-9 w-auto" />
+            </a>
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
               <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-ink-2 no-underline hover:text-ink"><WhatsAppGlyph size={14} /> 2622 51-7454</a>
               <a href={`mailto:${CONTACT_EMAIL}`} className="text-ink-2 no-underline hover:text-ink">{CONTACT_EMAIL}</a>
-              <a href="https://www.clarusrock.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-ink-3 no-underline hover:text-ink-2">
-                Sitio por <img src="/imgs/clarus_rock_logotipo_black_version.svg" alt="Clarus Rock" width={71} height={24} loading="lazy" className="h-6 w-auto" />
-              </a>
             </div>
           </div>
         </footer>
