@@ -536,7 +536,7 @@ export function Landing() {
 
         {/* ── NAV ── */}
         <header className="sticky top-0 z-50 border-b border-line/80 bg-paper/90 backdrop-blur">
-          <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 py-3">
+          <nav className="mx-auto flex max-w-6xl items-center justify-between gap-2 sm:gap-4 px-4 sm:px-6 py-3">
             <div className="flex items-center gap-3">
               {isFromApp && (
                 <button onClick={() => navigate(-1)} className="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-2 hover:bg-paper-2 cursor-pointer bg-transparent">
@@ -547,7 +547,7 @@ export function Landing() {
                 <motion.img src="/imgs/logo-gesto-96.webp" alt="" width={32} height={32} className="h-8 w-8 object-contain"
                   initial={{ opacity: 0, scale: 0.6, rotate: -20 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} transition={{ duration: 0.6, ease: EASE }} />
                 <motion.span initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.15, ease: EASE }}
-                  className="font-display text-xl font-bold text-ink">Gesto</motion.span>
+                  className="hidden min-[380px]:inline font-display text-xl font-bold text-ink">Gesto</motion.span>
               </a>
             </div>
             <ul className="hidden lg:flex items-center gap-6 list-none m-0 p-0 text-sm font-medium">
@@ -561,8 +561,8 @@ export function Landing() {
                 {voiceOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
                 <span className="hidden lg:inline">{voiceOn ? 'Voz activada' : 'Voz'}</span>
               </button>
-              <a href={APP_LOGIN_URL} target="_blank" rel="noopener noreferrer" className="hidden sm:inline px-3 py-2 text-sm font-medium text-ink-2 no-underline hover:text-ink">Ingresar</a>
-              <PrimaryButton className="px-4 py-2 text-sm">Probar gratis</PrimaryButton>
+              <a href={APP_LOGIN_URL} target="_blank" rel="noopener noreferrer" className="whitespace-nowrap px-1.5 sm:px-3 py-2 text-sm font-medium text-ink-2 no-underline hover:text-ink">Ingresar</a>
+              <PrimaryButton className="whitespace-nowrap px-3 sm:px-4 py-2 text-sm">Probar gratis</PrimaryButton>
             </div>
           </nav>
         </header>
