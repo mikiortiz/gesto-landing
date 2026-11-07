@@ -142,3 +142,8 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 package-lock.json
+
+
+# Claude Code: settings.json se versiona; lo local no
+.claude/*
+!.claude/settings.json
