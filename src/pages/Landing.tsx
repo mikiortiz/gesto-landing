@@ -23,7 +23,7 @@ const INTRO_SPEECH = 'Hola, soy Gesto. Te ayudo a vender, cobrar y llevar la caj
 const SECTION_SPEECH: Record<string, string> = {
   producto: 'Con mi punto de venta cobrás al toque. Escaneás el código, elegís cómo cobrar y listo: efectivo, QR de Mercado Pago, transferencia sin comisión o fiado. Y al final del turno, la caja te cierra.',
   fiados: '¿Cuánta plata perdés porque no podés cobrarle a los clientes a tiempo? Yo armo el mensaje con todo lo que te deben y lo mandamos por WhatsApp en un clic.',
-  'en-vivo': 'Podés tener varias cajas abiertas, en la compu o en el celular, y todo se actualiza al instante. Cuando Mercado Pago aprueba un pago, te enterás en el momento.',
+  'en-vivo': 'Podés tener varias cajas abiertas, en la compu o en el celular (según tu plan), y todo se actualiza al instante. Cuando Mercado Pago aprueba un pago, te enterás en el momento.',
   voz: 'Si tenés las manos ocupadas, decime Gesto y pedime lo que necesites: agregar al carrito, cobrar, o consultar un precio. Y preguntame lo que quieras sobre tus ventas, tu stock o tus fiados.',
   'primeros-pasos': 'Arrancar es fácil, porque no estás solo. Apenas entrás, yo te acompaño paso a paso hasta dejar tu negocio listo para vender.',
   planes: 'Podés probarme sesenta días gratis, sin tarjeta. Después pagás mes a mes, y cambiás de plan cuando quieras.',
@@ -54,8 +54,8 @@ const PLANS = [
     name: 'Esencial',
     price: 20000,
     period: 'por mes',
-    note: 'Lo necesario para el día a día del mostrador.',
-    features: ['2 cajas abiertas a la vez', 'Hasta 2 locales', 'Ventas, caja, stock y fiados', 'Cobros con QR y transferencia'],
+    note: 'Lo necesario para un comercio de un solo mostrador.',
+    features: ['1 caja abierta a la vez', '1 local', 'Ventas, caja, stock y fiados', 'Cobros con QR y transferencia'],
     cta: 'Elegir Esencial',
     featured: false,
   },
@@ -63,8 +63,8 @@ const PLANS = [
     name: 'Profesional',
     price: 35000,
     period: 'por mes',
-    note: 'Para comercios con más movimiento y más de un turno.',
-    features: ['3 cajas abiertas a la vez', 'Hasta 3 locales', 'Asistente de voz y chat con IA', 'Cierre a ciegas e historial de cierres en PDF'],
+    note: 'Para comercios con más de una caja y más movimiento.',
+    features: ['3 cajas abiertas a la vez', '1 local', 'Asistente de voz y chat con IA', 'Cierre a ciegas e historial de cierres en PDF'],
     cta: 'Elegir Profesional',
     featured: true,
   },
@@ -73,7 +73,7 @@ const PLANS = [
 const FAQ: [string, string][] = [
   ['¿Necesito tarjeta para probarlo?', 'No. Nos escribís por WhatsApp o email, te damos de alta y tenés 60 días con todas las funciones. Si después querés seguir, elegís un plan y lo pagás con Mercado Pago, mes a mes.'],
   ['¿Qué pasa cuando terminan los 60 días?', 'Podés seguir entrando y ver todo lo que cargaste, pero para vender y abrir caja hay que activar un plan. No se borra nada.'],
-  ['¿Funciona en el celular?', 'Sí. Gesto funciona en el navegador de la compu, la tablet o el celular, y podés tener varias cajas abiertas en distintos dispositivos.'],
+  ['¿Funciona en el celular?', 'Sí. Gesto funciona en el navegador de la compu, la tablet o el celular, y podés tener varias cajas abiertas en distintos dispositivos (según tu plan).'],
   ['¿Qué lector de códigos necesito?', 'Cualquier lector USB común. Si no tenés, podés escanear con la cámara del celular o buscar el producto por nombre.'],
   ['¿Las transferencias tienen comisión?', 'No. La plata va directo a tu CBU o alias; Gesto no la toca. Los cobros con QR de Mercado Pago tienen la comisión de Mercado Pago, en tu propia cuenta.'],
   ['¿Tengo que cargar todos los productos a mano?', 'No. Gesto tiene una base de más de 37.000 productos: escaneás el código y se completan nombre y marca. Vos solo ponés precio y stock.'],
@@ -833,6 +833,9 @@ export function Landing() {
             <Reveal>
               <p className="mt-6 text-sm text-ink-3">
                 Próximamente: <strong className="font-semibold text-ink-2">IA + GPS Integral</strong> ({priceFormatter.format(50000)}/mes) con hasta 5 cajas, tu comercio en el mapa y recomendaciones de precios por email.
+              </p>
+              <p className="mt-2 text-sm text-ink-3">
+                Cada plan cubre un local. Si tenés más de uno, cada local lleva su propia suscripción.
               </p>
             </Reveal>
             </Replay>

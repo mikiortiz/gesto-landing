@@ -17,3 +17,4 @@ npm run preview
 - Se llega también desde la app con el estado `{ fromApp: true }`, que muestra el botón "Volver": no romperlo.
 - Arreglos chicos, una vez verificados en el navegador, van de `develop` directo a producción (`main`). `main` tiene regla de PR que el push del dueño saltea; no abrir PRs salvo que se pida.
 - Lo visual no se da por terminado sin captura o sin verlo en el navegador.
+- Los planes (`PLANS` en `src/pages/Landing.tsx` y `public/llms.txt`) copian `PLAN_LIMITS` del back (`services/servicePlan.js`): prueba gratis 3 cajas, Esencial 1, Profesional 3, Enterprise 5, y un local en todos los planes. Si cambian en el back, cambiarlos acá.
