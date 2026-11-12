@@ -4,6 +4,7 @@ import { motion, MotionConfig, AnimatePresence, type Variants } from 'framer-mot
 import {
   Check, ChevronDown, Download, Volume2, VolumeX, ArrowRight, ScanBarcode, Mic, Banknote, Landmark,
   NotebookPen, Scale, MonitorSmartphone, Split, PauseCircle, Laptop, Smartphone, Sparkles, Bell, Mail, X,
+  UserRound, KeyRound, Users, EyeOff,
 } from 'lucide-react';
 import { speak } from '../services/speechService';
 
@@ -46,7 +47,7 @@ const PLANS = [
     price: 'Gratis',
     period: '60 días',
     note: 'Todo incluido para que lo pruebes en serio.',
-    features: ['3 cajas abiertas a la vez', '1 local', 'Asistente de voz y chat con IA', 'Soporte por email'],
+    features: ['3 cajas abiertas a la vez', '1 local', '3 cajeros con PIN', 'Asistente de voz y chat con IA', 'Soporte por email'],
     cta: 'Pedir la prueba',
     featured: false,
   },
@@ -55,7 +56,7 @@ const PLANS = [
     price: 20000,
     period: 'por mes',
     note: 'Lo necesario para un comercio de un solo mostrador.',
-    features: ['1 caja abierta a la vez', '1 local', 'Ventas, caja, stock y fiados', 'Cobros con QR y transferencia'],
+    features: ['1 caja abierta a la vez', '1 local', '1 cajero con PIN', 'Ventas, caja, stock y fiados', 'Cobros con QR y transferencia'],
     cta: 'Elegir Esencial',
     featured: false,
   },
@@ -64,7 +65,7 @@ const PLANS = [
     price: 35000,
     period: 'por mes',
     note: 'Para comercios con más de una caja y más movimiento.',
-    features: ['3 cajas abiertas a la vez', '1 local', 'Asistente de voz y chat con IA', 'Cierre a ciegas e historial de cierres en PDF'],
+    features: ['3 cajas abiertas a la vez', '1 local', '3 cajeros con PIN', 'Asistente de voz y chat con IA', 'Cierre a ciegas e historial de cierres en PDF'],
     cta: 'Elegir Profesional',
     featured: true,
   },
@@ -76,6 +77,7 @@ const FAQ: [string, string][] = [
   ['¿Funciona en el celular?', 'Sí. Gesto funciona en el navegador de la compu, la tablet o el celular, y podés tener varias cajas abiertas en distintos dispositivos (según tu plan).'],
   ['¿Qué lector de códigos necesito?', 'Cualquier lector USB común. Si no tenés, podés escanear con la cámara del celular o buscar el producto por nombre.'],
   ['¿Las transferencias tienen comisión?', 'No. La plata va directo a tu CBU o alias; Gesto no la toca. Los cobros con QR de Mercado Pago tienen la comisión de Mercado Pago, en tu propia cuenta.'],
+  ['¿Mis empleados ven las ganancias y las ventas?', 'No, si entran como cajeros. Les creás un cajero con nombre y PIN, y en la caja ven solo lo que necesitan para vender: el punto de venta y su turno. Cada venta y cada cierre quedan a su nombre, y vos ves un resumen por cajero.'],
   ['¿Tengo que cargar todos los productos a mano?', 'No. Gesto tiene una base de más de 37.000 productos: escaneás el código y se completan nombre y marca. Vos solo ponés precio y stock.'],
 ];
 
@@ -282,6 +284,39 @@ function CashScreen() {
               <div className="tabular-nums font-semibold text-ink">{priceFormatter.format(Number(v))}</div>
             </div>
           ))}
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+function CashierScreen() {
+  const rows: [string, number, number][] = [['Ana', 42, 186400], ['Lucas', 31, 129750], ['Vos (dueño)', 8, 40200]];
+  return (
+    <Screen title="Caja · PC mostrador">
+      <div className="p-4 sm:p-5 text-sm">
+        <div className="font-semibold text-ink">¿Quién está en la caja?</div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {['Ana', 'Lucas'].map((name, i) => (
+            <div key={name} className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 ${i === 0 ? 'border-teal bg-teal-soft/40' : 'border-line'}`}>
+              <UserRound size={22} className="text-ink-3" />
+              <span className="font-semibold text-ink">{name}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex items-center justify-center gap-2 rounded-lg bg-paper py-2 text-ink-2">
+          <KeyRound size={14} /> <span className="tracking-[0.4em] font-mono">••••</span>
+        </div>
+        <div className="mt-4 border-t border-line pt-3">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-3">Resumen por cajero</div>
+          <ul className="space-y-1.5">
+            {rows.map(([name, count, total]) => (
+              <li key={name} className="flex justify-between">
+                <span className="text-ink-2">{name}</span>
+                <span className="tabular-nums text-ink"><span className="text-ink-3">{count} ventas · </span>{priceFormatter.format(total)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </Screen>
@@ -667,6 +702,25 @@ export function Landing() {
                   <Item><p className="text-sm text-ink-3">Con el plan Profesional: cierre a ciegas (quien cuenta no ve el total esperado) e historial de cierres en PDF.</p></Item>
                 </Reveal>
                 <Reveal className="lg:order-1 lg:mr-8"><CashScreen /></Reveal>
+              </div>
+
+              <div className="grid items-center gap-10 lg:grid-cols-2">
+                <Reveal group>
+                  <Item><h3 className="font-display text-2xl font-bold mb-3">Tus empleados venden, vos ves todo</h3></Item>
+                  <Item><p className="text-ink-2 leading-relaxed mb-5">Creás un cajero con nombre y PIN. Entra en la compu o el celular del local que vos elegiste, y ve solo lo que necesita para vender. Cada venta y cada turno quedan a su nombre.</p></Item>
+                  <ul className="m-0 list-none space-y-3 p-0 text-ink">
+                    {([
+                      [<KeyRound key="k" size={18} className="text-teal" />, 'Entra con su PIN, sin tu contraseña'],
+                      [<EyeOff key="e" size={18} className="text-teal" />, 'No ve ganancias, historial de ventas ni configuración'],
+                      [<Users key="u" size={18} className="text-teal" />, '"Cambiar cajero" en el cambio de turno: se cuenta la plata y sigue el otro'],
+                      [<MonitorSmartphone key="m" size={18} className="text-teal" />, 'Vos elegís en qué equipos se puede usar, y lo desvinculás al instante'],
+                    ] as [React.ReactNode, string][]).map(([icon, t]) => (
+                      <ItemLi key={t} className="flex items-start gap-3"><span className="flex h-6 w-6 flex-shrink-0 items-center justify-center">{icon}</span>{t}</ItemLi>
+                    ))}
+                  </ul>
+                  <Item><p className="mt-5 text-sm text-ink-3">Si falta plata, sabés en qué turno fue: el resumen por cajero muestra ventas, turnos y faltantes.</p></Item>
+                </Reveal>
+                <Reveal className="lg:ml-8"><CashierScreen /></Reveal>
               </div>
 
               <div className="grid items-center gap-10 lg:grid-cols-2">
