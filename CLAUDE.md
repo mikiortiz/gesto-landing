@@ -1,6 +1,6 @@
 # CLAUDE.md — gesto-landing
 
-> Estado al 12/11/2026 (rama `develop`): bloque "Tus empleados venden, vos ves todo" (cajeros), cajeros por plan y pregunta frecuente. **No pasar a `main` hasta que cajeros esté en producción en la app** (hoy solo en develop). Antes: commit `f20293f`. Mapa general de ClarusRock: `CLAUDE.md` de la carpeta raíz (local, no versionado).
+> Estado al 12/11/2026 (rama `develop`): bloque "Tus empleados venden, vos ves todo" (cajeros), cajeros por plan, pregunta frecuente y el manual (`public/docs/gesto-manual-de-uso.pdf`) con la sección 16 Cajeros. **No pasar a `main` hasta que cajeros esté en producción en la app** (hoy solo en develop). Antes: commit `f20293f`. Mapa general de ClarusRock: `CLAUDE.md` de la carpeta raíz (local, no versionado).
 
 Landing pública de **Gesto.lat**. Sitio estático (React 19 + TypeScript + Vite, Tailwind v4, MUI v7, Framer Motion), deployado aparte en Vercel. **No se conecta a ningún backend.** El diseño, el contenido y la estructura están en `LANDING_STANDALONE_BRIEFING.md`.
 
