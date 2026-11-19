@@ -10,7 +10,11 @@
       "Bash(git push * -f*)",
       "PowerShell(git push * -f*)",
       "Bash(git reset --hard*)",
-      "PowerShell(git reset --hard*)"
+      "PowerShell(git reset --hard*)",
+      "Bash(git clean*)",
+      "PowerShell(git clean*)",
+      "Bash(git branch -D*)",
+      "PowerShell(git branch -D*)"
     ],
     "ask": [
       "Bash(git push * main*)",
